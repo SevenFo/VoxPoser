@@ -5,7 +5,7 @@ from pygments import highlight
 from pygments.lexers import PythonLexer
 from pygments.formatters import TerminalFormatter
 from utils import load_prompt, DynamicObservation, IterableDynamicObservation
-import time
+import time, textwrap, inspect
 from LLM_cache import DiskCache
 
 
@@ -33,6 +33,7 @@ class LMP:
         self._context = None
         self._cache = DiskCache(load_cache=self._cfg["load_cache"])
         self._engine_call = engine_call_fn
+        self._history_file_name = f"code-history.txt"
 
     def clear_exec_hist(self):
         self.exec_hist = ""
@@ -71,29 +72,10 @@ class LMP:
             ]
         ):
             # add special prompt for chat endpoint
-            # user1 = kwargs.pop('prompt')
-            # new_query = '# Query:' + user1.split('# Query:')[-1]
-            # user1 = ''.join(user1.split('# Query:')[:-1]).strip()
             instruction = "续写代码，不要出现任何不是代码的语言，把续写的代码放在markdown格式中发给我，不要解释代码"
             instruction = (
                 "你现在是一个写代码专家，续写下列这段代码（尤其需要根据最后一行的注释完成接下去的代码），不要出现其他解释性语句，以最后一行注释开头"
             )
-            # user1 = f"I would like you to help me write Python code to control a robot arm operating in a tabletop environment. Please complete the code every time when I give you new query. Pay attention to appeared patterns in the given context code. Be thorough and thoughtful in your code. Do not include any import statement. Do not repeat my question. Do not provide any text explanation (comment in code is okay). I will first give you the context of the code below:\n\n```\n{user1}\n```\n\nNote that x is back to front, y is left to right, and z is bottom to up."
-            # assistant1 = f'Got it. I will complete what you give me next.'
-            # user2 = new_query
-            # handle given context (this was written originally for completion endpoint)
-            # if user1.split('\n')[-4].startswith('objects = ['):
-            #     obj_context = user1.split('\n')[-4]
-            #     # remove obj_context from user1
-            #     user1 = '\n'.join(user1.split('\n')[:-4]) + '\n' + '\n'.join(user1.split('\n')[-3:])
-            #     # add obj_context to user2
-            #     user2 = obj_context.strip() + '\n' + user2
-            # messages=[
-            #     {"role": "system", "content": "You are a helpful assistant that pays attention to the user's instructions and writes good python code for operating a robot arm in a tabletop environment."},
-            #     {"role": "user", "content": user1},
-            #     {"role": "assistant", "content": assistant1},
-            #     {"role": "user", "content": user2},
-            # ]
             messagesv2 = [
                 {"role": "user", "content": instruction + "\n" + kwargs.pop("prompt")}
             ]
@@ -124,6 +106,9 @@ class LMP:
                 return ret
 
     def __call__(self, query, **kwargs):
+        calling_level = len(inspect.getouterframes(inspect.currentframe())) // 3
+        print("calling level:", calling_level)
+
         prompt, user_query = self.build_prompt(query)
 
         start_time = time.time()
@@ -177,6 +162,13 @@ class LMP:
             to_exec = "def ret_val():\n" + to_exec.replace("ret_val = ", "return ")
             to_exec = to_exec.replace("\n", "\n    ")
 
+        if calling_level == 0:
+            with open(self._history_file_name, "w") as f:
+                f.write(f"{to_log.strip()}\n")
+        else:
+            with open(self._history_file_name, "a") as f:
+                f.write(textwrap.indent(f"{to_log.strip()}\n", "    " * calling_level))
+
         if self._debug:
             # only "execute" function performs actions in environment, so we comment it out
             action_str = ["execute("]
@@ -190,6 +182,14 @@ class LMP:
                 pdb.set_trace()
         else:
             exec_safe(to_exec, gvars, lvars)
+            """
+            Local variables in Python are those which are initialized inside a function and belong only to that particular function. 
+            It cannot be accessed anywhere outside the function. 
+            Global Variables are those which are defined outside any function and which are accessible throughout the program, 
+            i.e., inside and outside of every function.
+            If we initalize a local variable (in a function) with the same name with a global varible, it just "ignore" the globle variable,
+            i.e., you cant change the value of a globle variable, i.e., globle variables are readonly in the function
+            """
 
         self.exec_hist += f"\n{to_log.strip()}"
 

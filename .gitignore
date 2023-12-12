@@ -3,3 +3,5 @@
 src/visualizations/
 src/cache/
 src/configs/secret/
+/*.py
+*.txt

@@ -45,5 +45,7 @@ set_lmp_objects(
     lmps, env.get_object_names()
 )  # set the object names to be used by voxposer
 
+# 关于task description从哪里来的: rlbench 内置了一些task，并且这些task有多种描述，ref:https://github.com/stepjam/RLBench/blob/master/tutorials/simple_task.md
+
 instruction = np.random.choice(descriptions)
 voxposer_ui(instruction)
