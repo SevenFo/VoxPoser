@@ -5,43 +5,48 @@ import plotly.graph_objects as go
 import datetime
 from transforms3d.quaternions import mat2quat
 
+
 def set_lmp_objects(lmps, objects):
     if isinstance(lmps, dict):
         lmps = lmps.values()
     for lmp in lmps:
-        lmp._context = f'objects = {objects}'
+        lmp._context = f"objects = {objects}"
+
 
 def get_clock_time(milliseconds=False):
     curr_time = datetime.datetime.now()
     if milliseconds:
-        return f'{curr_time.hour}:{curr_time.minute}:{curr_time.second}.{curr_time.microsecond // 1000}'
+        return f"{curr_time.hour}:{curr_time.minute}:{curr_time.second}.{curr_time.microsecond // 1000}"
     else:
-        return f'{curr_time.hour}:{curr_time.minute}:{curr_time.second}'
+        return f"{curr_time.hour}:{curr_time.minute}:{curr_time.second}"
+
 
 class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+    HEADER = "\033[95m"
+    OKBLUE = "\033[94m"
+    OKCYAN = "\033[96m"
+    OKGREEN = "\033[92m"
+    WARNING = "\033[93m"
+    FAIL = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
+    UNDERLINE = "\033[4m"
+
 
 def load_prompt(prompt_fname):
     # get current directory
     curr_dir = os.path.dirname(os.path.abspath(__file__))
     # get full path to file
-    if '/' in prompt_fname:
-        prompt_fname = prompt_fname.split('/')
-        full_path = os.path.join(curr_dir, 'prompts', *prompt_fname)
+    if "/" in prompt_fname:
+        prompt_fname = prompt_fname.split("/")
+        full_path = os.path.join(curr_dir, "prompts", *prompt_fname)
     else:
-        full_path = os.path.join(curr_dir, 'prompts', prompt_fname)
+        full_path = os.path.join(curr_dir, "prompts", prompt_fname)
     # read file
-    with open(full_path, 'r') as f:
+    with open(full_path, "r") as f:
         contents = f.read().strip()
     return contents
+
 
 def normalize_vector(x, eps=1e-6):
     """normalize a vector to unit length"""
@@ -55,12 +60,14 @@ def normalize_vector(x, eps=1e-6):
         normalized[norm > eps] = x[norm > eps] / norm[norm > eps][:, None]
         return normalized
 
+
 def normalize_map(map):
     """normalization voxel maps to [0, 1] without producing nan"""
     denom = map.max() - map.min()
     if denom == 0:
         return map
     return (map - map.min()) / denom
+
 
 def calc_curvature(path):
     dx = np.gradient(path[:, 0])
@@ -69,15 +76,21 @@ def calc_curvature(path):
     ddx = np.gradient(dx)
     ddy = np.gradient(dy)
     ddz = np.gradient(dz)
-    curvature = np.sqrt((ddy * dx - ddx * dy)**2 + (ddz * dx - ddx * dz)**2 + (ddz * dy - ddy * dz)**2) / np.power(dx**2 + dy**2 + dz**2, 3/2)
+    curvature = np.sqrt(
+        (ddy * dx - ddx * dy) ** 2
+        + (ddz * dx - ddx * dz) ** 2
+        + (ddz * dy - ddy * dz) ** 2
+    ) / np.power(dx**2 + dy**2 + dz**2, 3 / 2)
     # convert any nan to 0
     curvature[np.isnan(curvature)] = 0
     return curvature
 
+
 class IterableDynamicObservation:
     """acts like a list of DynamicObservation objects, initialized with a function that evaluates to a list"""
+
     def __init__(self, func):
-        assert callable(func), 'func must be callable'
+        assert callable(func), "func must be callable"
         self.func = func
         self._validate_func_output()
 
@@ -86,7 +99,7 @@ class IterableDynamicObservation:
         # if not evaluated result not a list while a single object
         # if not isinstance(evaluated, list):
         #     evaluated = [evaluated]
-        assert isinstance(evaluated, list), 'func must evaluate to a list'
+        assert isinstance(evaluated, list), "func must evaluate to a list"
 
     def __getitem__(self, index):
         def helper():
@@ -94,6 +107,7 @@ class IterableDynamicObservation:
             item = evaluated[index]
             # assert isinstance(item, Observation), f'got type {type(item)} instead of Observation'
             return item
+
         return helper
 
     def __len__(self):
@@ -107,25 +121,31 @@ class IterableDynamicObservation:
         static_list = self.func()
         return static_list
 
+
 class DynamicObservation:
     """acts like dict observation but initialized with a function such that it uses the latest info"""
+
     def __init__(self, func):
         try:
-            assert callable(func) and not isinstance(func, dict), 'func must be callable or cannot be a dict'
+            assert callable(func) and not isinstance(
+                func, dict
+            ), "func must be callable or cannot be a dict"
         except AssertionError as e:
             print(e)
-            import pdb; pdb.set_trace()
+            import pdb
+
+            pdb.set_trace()
         self.func = func
-    
+
     def __get__(self, key):
         evaluated = self.func()
         if isinstance(evaluated[key], np.ndarray):
             return evaluated[key].copy()
         return evaluated[key]
-    
+
     def __getattr__(self, key):
         return self.__get__(key)
-    
+
     def __getitem__(self, key):
         return self.__get__(key)
 
@@ -135,22 +155,24 @@ class DynamicObservation:
             static_obs = Observation(static_obs)
         return static_obs
 
+
 class Observation(dict):
     def __init__(self, obs_dict):
         super().__init__(obs_dict)
         self.obs_dict = obs_dict
-    
+
     def __getattr__(self, key):
         return self.obs_dict[key]
-    
+
     def __getitem__(self, key):
         return self.obs_dict[key]
 
     def __getstate__(self):
         return self.obs_dict
-    
+
     def __setstate__(self, state):
         self.obs_dict = state
+
 
 def pointat2quat(pointat):
     """
@@ -175,18 +197,29 @@ def pointat2quat(pointat):
     quat_wxyz = mat2quat(rotmat)
     return quat_wxyz
 
+
 def visualize_points(point_cloud, point_colors=None, show=True):
     """visualize point clouds using plotly"""
     if point_colors is None:
         point_colors = point_cloud[:, 2]
-    fig = go.Figure(data=[go.Scatter3d(x=point_cloud[:, 0], y=point_cloud[:, 1], z=point_cloud[:, 2],
-                                    mode='markers', marker=dict(size=3, color=point_colors, opacity=1.0))])
+    fig = go.Figure(
+        data=[
+            go.Scatter3d(
+                x=point_cloud[:, 0],
+                y=point_cloud[:, 1],
+                z=point_cloud[:, 2],
+                mode="markers",
+                marker=dict(size=3, color=point_colors, opacity=1.0),
+            )
+        ]
+    )
     if show:
         fig.show()
     else:
         # save to html
-        fig.write_html('temp_pc.html')
-        print(f'Point cloud saved to temp_pc.html')
+        fig.write_html("temp_pc.html")
+        print(f"Point cloud saved to temp_pc.html")
+
 
 def _process_llm_index(indices, array_shape):
     """
@@ -194,12 +227,25 @@ def _process_llm_index(indices, array_shape):
     handles non-integer indexing
     handles negative indexing with manually designed special cases
     """
-    if isinstance(indices, int) or isinstance(indices, np.int64) or isinstance(indices, np.int32) or isinstance(indices, np.int16) or isinstance(indices, np.int8):
+    if (
+        isinstance(indices, int)
+        or isinstance(indices, np.int64)
+        or isinstance(indices, np.int32)
+        or isinstance(indices, np.int16)
+        or isinstance(indices, np.int8)
+    ):
         processed = indices if indices >= 0 or indices == -1 else 0
         assert len(array_shape) == 1, "1D array expected"
         processed = min(processed, array_shape[0] - 1)
-    elif isinstance(indices, float) or isinstance(indices, np.float64) or isinstance(indices, np.float32) or isinstance(indices, np.float16):
-        processed = np.round(indices).astype(int) if indices >= 0 or indices == -1 else 0
+    elif (
+        isinstance(indices, float)
+        or isinstance(indices, np.float64)
+        or isinstance(indices, np.float32)
+        or isinstance(indices, np.float16)
+    ):
+        processed = (
+            np.round(indices).astype(int) if indices >= 0 or indices == -1 else 0
+        )
         assert len(array_shape) == 1, "1D array expected"
         processed = min(processed, array_shape[0] - 1)
     elif isinstance(indices, slice):
@@ -230,126 +276,130 @@ def _process_llm_index(indices, array_shape):
         raise TypeError("Indexing type not supported")
     # give warning if index was negative
     if processed != indices:
-        print(f"[IndexingWrapper] Warning: index was changed from {indices} to {processed}")
+        print(
+            f"[IndexingWrapper] Warning: index was changed from {indices} to {processed}"
+        )
     # print(f"[IndexingWrapper] {idx} -> {processed}")
     return processed
+
 
 class VoxelIndexingWrapper:
     """
     LLM indexing wrapper that uses _process_llm_index to process indexing
     behaves like a numpy array
     """
+
     def __init__(self, array):
         self.array = array
 
     def __getitem__(self, idx):
         return self.array[_process_llm_index(idx, tuple(self.array.shape))]
-    
+
     def __setitem__(self, idx, value):
         self.array[_process_llm_index(idx, tuple(self.array.shape))] = value
-    
+
     def __repr__(self) -> str:
         return self.array.__repr__()
-    
+
     def __str__(self) -> str:
         return self.array.__str__()
-    
+
     def __eq__(self, other):
         return self.array == other
-    
+
     def __ne__(self, other):
         return self.array != other
-    
+
     def __lt__(self, other):
         return self.array < other
-    
+
     def __le__(self, other):
         return self.array <= other
-    
+
     def __gt__(self, other):
         return self.array > other
-    
+
     def __ge__(self, other):
         return self.array >= other
-    
+
     def __add__(self, other):
         return self.array + other
-    
+
     def __sub__(self, other):
         return self.array - other
-    
+
     def __mul__(self, other):
         return self.array * other
-    
+
     def __truediv__(self, other):
         return self.array / other
-    
+
     def __floordiv__(self, other):
         return self.array // other
-    
+
     def __mod__(self, other):
         return self.array % other
-    
+
     def __divmod__(self, other):
         return self.array.__divmod__(other)
-    
+
     def __pow__(self, other):
-        return self.array ** other
-    
+        return self.array**other
+
     def __lshift__(self, other):
         return self.array << other
-    
+
     def __rshift__(self, other):
         return self.array >> other
-    
+
     def __and__(self, other):
         return self.array & other
-    
+
     def __xor__(self, other):
         return self.array ^ other
-    
+
     def __or__(self, other):
         return self.array | other
-    
+
     def __radd__(self, other):
         return other + self.array
-    
+
     def __rsub__(self, other):
         return other - self.array
-    
+
     def __rmul__(self, other):
         return other * self.array
-    
+
     def __rtruediv__(self, other):
         return other / self.array
-    
+
     def __rfloordiv__(self, other):
         return other // self.array
-    
+
     def __rmod__(self, other):
         return other % self.array
-    
+
     def __rdivmod__(self, other):
         return other.__divmod__(self.array)
-    
+
     def __rpow__(self, other):
-        return other ** self.array
-    
+        return other**self.array
+
     def __rlshift__(self, other):
         return other << self.array
-    
+
     def __rrshift__(self, other):
         return other >> self.array
-    
+
     def __rand__(self, other):
         return other & self.array
-    
+
     def __rxor__(self, other):
         return other ^ self.array
-    
+
     def __ror__(self, other):
         return other | self.array
-    
+
     def __getattribute__(self, name):
         if name == "array":
             return super().__getattribute__(name)
@@ -360,6 +410,6 @@ class VoxelIndexingWrapper:
         else:
             # print(name)
             return super().array.__getattribute__(name)
-    
+
     def __getattr__(self, name):
         return self.array.__getattribute__(name)
