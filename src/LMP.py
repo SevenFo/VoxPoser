@@ -1,7 +1,7 @@
 
 import openai
 from time import sleep
-from openai.error import RateLimitError, APIConnectionError
+from openai import RateLimitError, APIConnectionError
 from pygments import highlight
 from pygments.lexers import PythonLexer
 from pygments.formatters import TerminalFormatter
@@ -11,7 +11,7 @@ from LLM_cache import DiskCache
 
 class LMP:
     """Language Model Program (LMP), adopted from Code as Policies."""
-    def __init__(self, name, cfg, fixed_vars, variable_vars, debug=False, env='rlbench'):
+    def __init__(self, name, cfg, fixed_vars, variable_vars, debug=False, env='rlbench',engine_call_fn = None):
         self._name = name
         self._cfg = cfg
         self._debug = debug
@@ -22,6 +22,7 @@ class LMP:
         self.exec_hist = ''
         self._context = None
         self._cache = DiskCache(load_cache=self._cfg['load_cache'])
+        self._engine_call = engine_call_fn
 
     def clear_exec_hist(self):
         self.exec_hist = ''
@@ -49,34 +50,41 @@ class LMP:
     
     def _cached_api_call(self, **kwargs):
         # check whether completion endpoint or chat endpoint is used
-        if kwargs['model'] != 'gpt-3.5-turbo-instruct' and \
-            any([chat_model in kwargs['model'] for chat_model in ['gpt-3.5', 'gpt-4']]):
+        if any([chat_model in kwargs['model'] for chat_model in ['gpt-3.5', 'gpt-4', 'SparkV3']]):
             # add special prompt for chat endpoint
-            user1 = kwargs.pop('prompt')
-            new_query = '# Query:' + user1.split('# Query:')[-1]
-            user1 = ''.join(user1.split('# Query:')[:-1]).strip()
-            user1 = f"I would like you to help me write Python code to control a robot arm operating in a tabletop environment. Please complete the code every time when I give you new query. Pay attention to appeared patterns in the given context code. Be thorough and thoughtful in your code. Do not include any import statement. Do not repeat my question. Do not provide any text explanation (comment in code is okay). I will first give you the context of the code below:\n\n```\n{user1}\n```\n\nNote that x is back to front, y is left to right, and z is bottom to up."
-            assistant1 = f'Got it. I will complete what you give me next.'
-            user2 = new_query
+            # user1 = kwargs.pop('prompt')
+            # new_query = '# Query:' + user1.split('# Query:')[-1]
+            # user1 = ''.join(user1.split('# Query:')[:-1]).strip()
+            instruction = '续写代码，不要出现任何不是代码的语言，把续写的代码放在markdown格式中发给我，不要解释代码'
+            instruction = '你现在是一个写代码专家，续写下列这段代码（尤其需要根据最后一行的注释完成接下去的代码），不要出现其他解释性语句，以最后一行注释开头'
+            # user1 = f"I would like you to help me write Python code to control a robot arm operating in a tabletop environment. Please complete the code every time when I give you new query. Pay attention to appeared patterns in the given context code. Be thorough and thoughtful in your code. Do not include any import statement. Do not repeat my question. Do not provide any text explanation (comment in code is okay). I will first give you the context of the code below:\n\n```\n{user1}\n```\n\nNote that x is back to front, y is left to right, and z is bottom to up."
+            # assistant1 = f'Got it. I will complete what you give me next.'
+            # user2 = new_query
             # handle given context (this was written originally for completion endpoint)
-            if user1.split('\n')[-4].startswith('objects = ['):
-                obj_context = user1.split('\n')[-4]
-                # remove obj_context from user1
-                user1 = '\n'.join(user1.split('\n')[:-4]) + '\n' + '\n'.join(user1.split('\n')[-3:])
-                # add obj_context to user2
-                user2 = obj_context.strip() + '\n' + user2
-            messages=[
-                {"role": "system", "content": "You are a helpful assistant that pays attention to the user's instructions and writes good python code for operating a robot arm in a tabletop environment."},
-                {"role": "user", "content": user1},
-                {"role": "assistant", "content": assistant1},
-                {"role": "user", "content": user2},
+            # if user1.split('\n')[-4].startswith('objects = ['):
+            #     obj_context = user1.split('\n')[-4]
+            #     # remove obj_context from user1
+            #     user1 = '\n'.join(user1.split('\n')[:-4]) + '\n' + '\n'.join(user1.split('\n')[-3:])
+            #     # add obj_context to user2
+            #     user2 = obj_context.strip() + '\n' + user2
+            # messages=[
+            #     {"role": "system", "content": "You are a helpful assistant that pays attention to the user's instructions and writes good python code for operating a robot arm in a tabletop environment."},
+            #     {"role": "user", "content": user1},
+            #     {"role": "assistant", "content": assistant1},
+            #     {"role": "user", "content": user2},
+            # ]
+            messagesv2=[
+                {"role": "user", "content": instruction+'\n'+kwargs.pop('prompt')}
             ]
-            kwargs['messages'] = messages
+            kwargs['messages'] = messagesv2
             if kwargs in self._cache:
                 print('(using cache)', end=' ')
                 return self._cache[kwargs]
             else:
-                ret = openai.ChatCompletion.create(**kwargs)['choices'][0]['message']['content']
+                if self._engine_call is None:
+                    ret = openai.ChatCompletion.create(**kwargs)['choices'][0]['message']['content']
+                else:
+                    ret = self._engine_call(**kwargs) # i wish every engine should define an function to call
                 # post processing
                 ret = ret.replace('```', '').replace('python', '').strip()
                 self._cache[kwargs] = ret
@@ -154,6 +162,7 @@ class LMP:
             if self._name == 'parse_query_obj':
                 try:
                     # there may be multiple objects returned, but we also want them to be unevaluated functions so that we can access latest obs
+                    # 似乎 detect 函数返回的对象是一个函数，这样通过调用（evaluated）这个函数，便可以得到该对象的最新信息
                     return IterableDynamicObservation(lvars[self._cfg['return_val_name']])
                 except AssertionError:
                     return DynamicObservation(lvars[self._cfg['return_val_name']])
@@ -171,7 +180,7 @@ def merge_dicts(dicts):
 def exec_safe(code_str, gvars=None, lvars=None):
     banned_phrases = ['import', '__']
     for phrase in banned_phrases:
-        assert phrase not in code_str
+        assert phrase not in code_str, 'banned phrases appear in model ret'
   
     if gvars is None:
         gvars = {}

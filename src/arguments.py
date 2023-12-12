@@ -2,6 +2,15 @@
 import os
 import yaml
 
+def yaml_include(loader, node):
+    # Get the path out of the yaml file
+    file_name = os.path.join(os.path.dirname(loader.name), node.value)
+
+    with open(file_name) as inputfile:
+        return yaml.load(inputfile, Loader=yaml.FullLoader)
+
+yaml.add_constructor("!include", yaml_include)
+
 def load_config(config_path):
     with open(config_path, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)

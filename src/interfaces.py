@@ -37,6 +37,7 @@ class LMP_interface():
   
   def detect(self, obj_name):
     """return an observation dict containing useful information about the object"""
+    print("calling detect")
     if obj_name.lower() in EE_ALIAS:
       obs_dict = dict()
       obs_dict['name'] = obj_name
@@ -88,6 +89,7 @@ class LMP_interface():
       velocity_map: callable function that generates a 3D numpy array, the velocity voxel map
       gripper_map: callable function that generates a 3D numpy array, the gripper voxel map
     """
+    print("calling execute")
     # initialize default voxel maps if not specified
     if rotation_map is None:
       rotation_map = self._get_default_voxel_map('rotation')
@@ -398,7 +400,7 @@ class LMP_interface():
     avoidance_map = np.clip(avoidance_map, 0, 1)
     return avoidance_map
 
-def setup_LMP(env, general_config, debug=False):
+def setup_LMP(env, general_config, debug=False, engine_call_fn=None):
   controller_config = general_config['controller']
   planner_config = general_config['planner']
   lmp_env_config = general_config['lmp_config']['env']
@@ -422,20 +424,20 @@ def setup_LMP(env, general_config, debug=False):
   # allow LMPs to access other LMPs
   lmp_names = [name for name in lmps_config.keys() if not name in ['composer', 'planner', 'config']]
   low_level_lmps = {
-      k: LMP(k, lmps_config[k], fixed_vars, variable_vars, debug, env_name)
+      k: LMP(k, lmps_config[k], fixed_vars, variable_vars, debug, env_name,engine_call_fn=engine_call_fn)
       for k in lmp_names
   }
   variable_vars.update(low_level_lmps)
 
   # creating the LMP for skill-level composition
   composer = LMP(
-      'composer', lmps_config['composer'], fixed_vars, variable_vars, debug, env_name
+      'composer', lmps_config['composer'], fixed_vars, variable_vars, debug, env_name,engine_call_fn=engine_call_fn
   )
   variable_vars['composer'] = composer
 
   # creating the LMP that deals w/ high-level language commands
   task_planner = LMP(
-      'planner', lmps_config['planner'], fixed_vars, variable_vars, debug, env_name
+      'planner', lmps_config['planner'], fixed_vars, variable_vars, debug, env_name,engine_call_fn=engine_call_fn
   )
 
   lmps = {

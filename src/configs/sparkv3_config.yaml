@@ -1,0 +1,10 @@
+name: Spark
+url: "ws://spark-api.xf-yun.com/v3.1/chat"
+domain: 'generalv3'
+secret: !include ./secret/spark.yaml
+model_instruction: "你现在是一个写代码专家，续写下列这段代码（尤其需要根据最后一行的注释完成接下去的代码），不要出现其他解释性语句，以最后一行注释开头"
+model_params:
+  - temperature
+  - max_tokens
+  - top_k
+  - domain

@@ -1,0 +1,9 @@
+model_system_instruction: "You are a helpful assistant that pays attention to the user's instructions and writes good python code for operating a robot arm in a tabletop environment."
+model_prefix_instruction: "I would like you to help me write Python code to control a robot arm operating in a tabletop environment. Please complete the code every time when I give you new query. Pay attention to appeared patterns in the given context code. Be thorough and thoughtful in your code. Do not include any import statement. Do not repeat my question. Do not provide any text explanation (comment in code is okay). I will first give you the context of the code below:\n\n```\n{user1}\n```\n\nNote that x is back to front, y is left to right, and z is bottom to up."
+model_messages:
+  - role: system
+    content: ${model_system_instruction}
+  - role: user
+    content: "Got it. I will complete what you give me next."
+  - role: assistant
+    content: ${model_prefix_instruction}

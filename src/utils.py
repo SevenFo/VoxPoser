@@ -83,6 +83,9 @@ class IterableDynamicObservation:
 
     def _validate_func_output(self):
         evaluated = self.func()
+        # if not evaluated result not a list while a single object
+        # if not isinstance(evaluated, list):
+        #     evaluated = [evaluated]
         assert isinstance(evaluated, list), 'func must evaluate to a list'
 
     def __getitem__(self, index):
