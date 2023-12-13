@@ -5,7 +5,7 @@ from pygments import highlight
 from pygments.lexers import PythonLexer
 from pygments.formatters import TerminalFormatter
 from utils import load_prompt, DynamicObservation, IterableDynamicObservation
-import time, textwrap, inspect
+import time, textwrap, inspect, re
 from LLM_cache import DiskCache
 
 
@@ -31,12 +31,20 @@ class LMP:
         self._variable_vars = variable_vars
         self.exec_hist = ""
         self._context = None
-        self._cache = DiskCache(load_cache=self._cfg["load_cache"])
+        # self._cache = DiskCache(load_cache=self._cfg["load_cache"])
         self._engine_call = engine_call_fn
         self._history_file_name = f"code-history.txt"
 
     def clear_exec_hist(self):
         self.exec_hist = ""
+
+    def split_prompt(self, prompt):
+        if self._cfg["include_context"]:
+            pattern = r"(objects = .*?\n# Query:.*?(?:$|\n))"
+        else:
+            pattern = r"(\n# Query:.*?(?:$|\n))"
+        matches = re.split(pattern, prompt, flags=re.DOTALL)
+        return [matches[0] + "\n\n" + matches[1]] + matches[2:-1]
 
     def build_prompt(self, query):
         if len(self._variable_vars) > 0:
@@ -61,41 +69,20 @@ class LMP:
         user_query = f'{self._cfg["query_prefix"]}{query}{self._cfg["query_suffix"]}'
         prompt += f"\n{user_query}"
 
-        return prompt, user_query
+        return prompt, user_query, self.split_prompt(prompt=prompt)
 
     def _cached_api_call(self, **kwargs):
         # check whether completion endpoint or chat endpoint is used
         if any(
             [
                 chat_model in kwargs["model"]
-                for chat_model in ["gpt-3.5", "gpt-4", "SparkV3"]
+                for chat_model in ["gpt-3.5", "gpt-4", "SparkV3", "ERNIEV4"]
             ]
         ):
-            # add special prompt for chat endpoint
-            instruction = "续写代码，不要出现任何不是代码的语言，把续写的代码放在markdown格式中发给我，不要解释代码"
-            instruction = (
-                "你现在是一个写代码专家，续写下列这段代码（尤其需要根据最后一行的注释完成接下去的代码），不要出现其他解释性语句，以最后一行注释开头"
-            )
-            messagesv2 = [
-                {"role": "user", "content": instruction + "\n" + kwargs.pop("prompt")}
-            ]
-            kwargs["messages"] = messagesv2
-            if kwargs in self._cache:
-                print("(using cache)", end=" ")
-                return self._cache[kwargs]
-            else:
-                if self._engine_call is None:
-                    ret = openai.ChatCompletion.create(**kwargs)["choices"][0][
-                        "message"
-                    ]["content"]
-                else:
-                    ret = self._engine_call(
-                        **kwargs
-                    )  # i wish every engine should define an function to call
-                # post processing
-                ret = ret.replace("```", "").replace("python", "").strip()
-                self._cache[kwargs] = ret
-                return ret
+            ret = self._engine_call(
+                **kwargs
+            )  # i wish every engine should define an function to call
+            return ret
         else:
             if kwargs in self._cache:
                 print("(using cache)", end=" ")
@@ -109,17 +96,18 @@ class LMP:
         calling_level = len(inspect.getouterframes(inspect.currentframe())) // 3
         print("calling level:", calling_level)
 
-        prompt, user_query = self.build_prompt(query)
+        prompt, user_query, splited_prompt = self.build_prompt(query)
 
         start_time = time.time()
         while True:
             try:
-                code_str = self._cached_api_call(
-                    prompt=prompt,
+                code_str = self._engine_call(
+                    prompt=(prompt, splited_prompt),
                     stop=self._stop_tokens,
                     temperature=self._cfg["temperature"],
                     model=self._cfg["model"],
                     max_tokens=self._cfg["max_tokens"],
+                    use_cache=self._cfg["load_cache"],
                 )
                 break
             except (RateLimitError, APIConnectionError) as e:
@@ -161,6 +149,9 @@ class LMP:
         if not self._name in ["composer", "planner"]:
             to_exec = "def ret_val():\n" + to_exec.replace("ret_val = ", "return ")
             to_exec = to_exec.replace("\n", "\n    ")
+
+        with open(self._history_file_name, "r+") as f:
+            file_content = f.read()
 
         if calling_level == 0:
             with open(self._history_file_name, "w") as f:

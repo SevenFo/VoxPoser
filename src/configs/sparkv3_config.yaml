@@ -1,4 +1,5 @@
-name: Spark
+type: Spark
+version: V3
 url: "ws://spark-api.xf-yun.com/v3.1/chat"
 domain: 'generalv3'
 secret: !include ./secret/spark.yaml

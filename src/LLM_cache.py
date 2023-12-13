@@ -21,6 +21,9 @@ class DiskCache:
                 self._load_cache()
 
     def _generate_filename(self, key):
+        """
+        传入的key实际上是一个字典而不是字符串，是调用call的时候传入的参数字典
+        """
         key_str = json.dumps(key)
         key_hash = hashlib.sha1(key_str.encode("utf-8")).hexdigest()
         return f"{key_hash}.pkl"

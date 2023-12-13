@@ -2,6 +2,7 @@
 **/__pycache__
 src/visualizations/
 src/cache/
+src/achieves/
 src/configs/secret/
 /*.py
-*.txt
+/code-history.txt

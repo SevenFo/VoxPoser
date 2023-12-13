@@ -17,7 +17,7 @@ controller:
   horizon_length: 1
   num_samples: 10000
   ee_local: temperature
-  ee_local_radius: 0.15
+  e4_local_radius: 0.15
 
 visualizer:
   save_dir: ./visualizations
@@ -35,7 +35,7 @@ lmp_config:
       prompt_fname: planner_prompt
       model: gpt-4
       max_tokens: 512
-      temperature: 0
+      temperature: 0.4
       query_prefix: '# Query: '
       query_suffix: '.'
       stop:
@@ -47,10 +47,10 @@ lmp_config:
       return_val_name: ret_val
       load_cache: True
     composer:
-      prompt_fname: composer_prompt
+      prompt_fname: composer_prompt_short
       model: gpt-4
       max_tokens: 512
-      temperature: 0
+      temperature: 0.4
       query_prefix: '# Query: '
       query_suffix: '.'
       stop:
@@ -65,7 +65,7 @@ lmp_config:
       prompt_fname: parse_query_obj_prompt
       model: gpt-4
       max_tokens: 512
-      temperature: 0
+      temperature: 0.4
       query_prefix: '# Query: '
       query_suffix: '.'
       stop:
@@ -77,10 +77,10 @@ lmp_config:
       return_val_name: ret_val
       load_cache: True
     get_affordance_map:
-      prompt_fname: get_affordance_map_prompt
+      prompt_fname: get_affordance_map_prompt_short
       model: gpt-4
       max_tokens: 512
-      temperature: 0
+      temperature: 0.4
       query_prefix: '# Query: '
       query_suffix: '.'
       stop:
@@ -95,7 +95,7 @@ lmp_config:
       prompt_fname: get_avoidance_map_prompt
       model: gpt-4
       max_tokens: 512
-      temperature: 0
+      temperature: 0.4
       query_prefix: '# Query: '
       query_suffix: '.'
       stop:
@@ -110,7 +110,7 @@ lmp_config:
       prompt_fname: get_velocity_map_prompt
       model: gpt-4
       max_tokens: 512
-      temperature: 0
+      temperature: 0.4
       query_prefix: '# Query: '
       query_suffix: '.'
       stop:
@@ -125,7 +125,7 @@ lmp_config:
       prompt_fname: get_rotation_map_prompt
       model: gpt-4
       max_tokens: 512
-      temperature: 0
+      temperature: 0.4
       query_prefix: '# Query: '
       query_suffix: '.'
       stop:
@@ -140,7 +140,7 @@ lmp_config:
       prompt_fname: get_gripper_map_prompt
       model: gpt-4
       max_tokens: 512
-      temperature: 0
+      temperature: 0.4
       query_prefix: '# Query: '
       query_suffix: '.'
       stop:

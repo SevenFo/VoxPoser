@@ -1,5 +1,6 @@
 import _thread as thread
-import base64
+import base64, requests
+from typing import Any
 import datetime
 import hashlib
 import hmac
@@ -11,8 +12,21 @@ from datetime import datetime
 from time import mktime
 from urllib.parse import urlencode
 from wsgiref.handlers import format_date_time
+from LLM_cache import DiskCache
 
 import websocket  # 使用websocket_client
+
+
+def extract_content(text):
+    # pattern = r"```(?!.*\n```$)\s(.*?)\s```"  # 这段regex好像不太好
+    pattern = r"```.*\n([\s\S]*?)```"  # 捕获python代码块中的内容
+    # result = re.sub(r"[\u4e00-\u9fa5]+|[，。；；【】、！]+", "", text)    # 清除字符串中的中文
+    matches = re.findall(pattern, text, re.DOTALL)
+    return matches
+
+
+def chinese_filter(text):
+    return re.sub(r"[\u4e00-\u9fa5]+|[，。；；【】、！]+", "", text)  # 清除字符串中的中文
 
 
 class Ws_Param(object):
@@ -59,10 +73,129 @@ class Ws_Param(object):
         return url
 
 
+class ERNIE:
+    def __init__(self, **kwargs) -> None:
+        # pre set args
+        self._load_cache = False
+        if "load_cache" in kwargs:
+            self._load_cache = kwargs["load_cache"]
+        # get args from config file
+        self._full_name = kwargs["type"] + kwargs["version"]
+        self._api_key = kwargs["secret"]["api_key"]
+        self._secret_key = kwargs["secret"]["secret_key"]
+        self._cred_url = (
+            kwargs["url_cred"]
+            .replace("${api_key}", self._api_key)
+            .replace("${secret_key}", self._secret_key)
+        )
+        self._url = kwargs["url"]
+        self._model_instruction = kwargs[
+            "model_instruction"
+        ]  # default model instruction
+        self._temperature = 0.8  # default temperature
+        self._system_instruction = kwargs[
+            "model_system_instruction"
+        ]  # default system instruction
+        self._cache = DiskCache(load_cache=self._load_cache)
+
+    def get_access_token(self):
+        """
+        使用 API Key，Secret Key 获取access_token，替换下列示例中的应用API Key、应用Secret Key
+        """
+        payload = json.dumps("")
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+
+        response = requests.request(
+            "POST", self._cred_url, headers=headers, data=payload
+        )
+        return response.json().get("access_token")
+
+    def __call__(self, **kwds: Any) -> Any:
+        assert "prompt" in kwds.keys(), "engine call kwargs not contain messages"
+        prompt, splited_prompt = kwds["prompt"]
+        assert (
+            len(splited_prompt) % 2 == 1
+        ), f"len(splited_prompt)={len(splited_prompt)}, please ask assistant"
+        use_cache = False  # whether or not checking cache before calling API online
+        if "use_cache" in kwds and self._load_cache:
+            use_cache = True
+        temperature = self._temperature  # get default temperature
+        model_instruction = self._model_instruction  # get default model_instruction
+        stop_tokens = []
+        if "temperature" in kwds.keys():
+            # override the default temperature if it in kwds
+            temperature = kwds["temperature"]
+        if "model_system_instruction" in kwds.keys():
+            # override the model instruction but not override the system instruction
+            # so we can adjust the model instruction for any call
+            model_instruction = kwds["model_instruction"]
+        if "stop" in kwds.keys():
+            stop_tokens = kwds["stop"]
+
+        # type A message: a conversation contains all the prompt
+        # messages = [
+        #     {
+        #         "role": "user",
+        #         "content": model_instruction + "\n\n```\n" + prompt + "\n```\n\n",
+        #     }
+        # ]
+        # type B message: todo: a prompt a conversation (like few shot)
+        messages = []
+        for idx, content in enumerate(splited_prompt):
+            messages.append(
+                {"role": ["user", "assistant"][idx % 2], "content": content}
+            )
+
+        payload = json.dumps(
+            {
+                "messages": messages,
+                "temperature": temperature,
+                "stop": stop_tokens,
+                "system": self._system_instruction,
+            }
+        )
+
+        # chech if the result is in the cache
+        cache_key = {f"{self._full_name}": payload}
+        if use_cache:
+            if cache_key in self._cache:
+                print("(using cache)", end=" ")
+                return self._cache[cache_key]
+
+        # not in cache, recall API
+
+        headers = {"Content-Type": "application/json"}
+        try:
+            response = requests.request(
+                "POST",
+                self._url + self.get_access_token(),
+                headers=headers,
+                data=payload,
+            )
+            code_str = response.json()["result"]
+        except KeyError as e:
+            print("KeyError:", e)
+            print(response.content)
+            print(payload)
+            exit(1)
+            # todo: if reach the max length of API limit, need to switch to a shorter version
+
+        code_segments = extract_content(code_str)
+        if len(code_segments) > 0:
+            ret = code_segments[0].strip()
+        else:
+            ret = chinese_filter(code_str).strip()
+
+        # whatever caching the result
+        self._cache[cache_key] = ret
+        return ret
+
+
 class Spark:
     def __init__(self, **kwargs) -> None:
         websocket.enableTrace(False)
         # kwargs may contain appid,api_key,api_secret,url,doman
+        self._full_name = kwargs["type"] + kwargs["version"]
         self._appid = kwargs["secret"]["appid"]
         self._params = Ws_Param(
             APPID=self._appid,
@@ -126,11 +259,6 @@ class Spark:
         }
         return data
 
-    def extract_content(self, text):
-        pattern = r"```python\s(.*?)\s```"
-        matches = re.findall(pattern, text, re.DOTALL)
-        return matches
-
     def __call__(self, **kwargs):
         self.answer = ""
         assert "messages" in kwargs.keys(), "engine call kwargs not contain messages"
@@ -156,7 +284,7 @@ class Spark:
         ws.run_forever(
             sslopt={"cert_reqs": ssl.CERT_NONE}
         )  # loop until all messages received
-        code_segments = self.extract_content(self.answer)
+        code_segments = extract_content(self.answer)
         self.message = []
         if len(code_segments) > 0:
             return code_segments[0]

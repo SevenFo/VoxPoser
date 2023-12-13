@@ -64,3 +64,8 @@ ret_val = fragile_items
 objects = ['blue block', 'red block']
 # Query: green block.
 ret_val = None
+
+objects = ['anything', 'anything']
+# Query: gripper.
+gripper = detect('gripper')
+ret_val = gripper
