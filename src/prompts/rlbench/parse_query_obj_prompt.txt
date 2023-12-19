@@ -65,7 +65,7 @@ objects = ['blue block', 'red block']
 # Query: green block.
 ret_val = None
 
-objects = ['anything', 'anything']
+objects = ['cup', 'object_not_gripper']
 # Query: gripper.
 gripper = detect('gripper')
 ret_val = gripper

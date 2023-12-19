@@ -3,7 +3,6 @@ version: V4
 secret: !include ./secret/ernie.yaml
 url_cred: https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${api_key}&client_secret=${secret_key}
 url: https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions_pro?access_token=
-# model_instruction: "续写代码，如果你做的好我会给你100块钱，第一句话必须是续写的代码（就是新的代码），不要出现‘以下是续写的代码：’之类的语言，不要出现import，不要出现任何不是代码的语言（比如中文或者解释性的语言），直接以新的代码开头"
-model_instruction: "续写代码，如果你出现import、重复我给你的query、书写其他非代码部分等行为，你将失去十万的报酬"
-model_system_instruction: "续写代码，如果你做的好我会给你100块钱，第一句话必须是续写的代码（就是新的代码），不要出现‘以下是续写的代码：’之类的语言，不要出现import，不要出现任何不是代码的语言（比如中文或者解释性的语言），直接以新的代码开头，不要出现除了代码以外的任何内容"
+model_instruction: "续写代码，第一句话必须是续写的代码（就是新的代码），直接以新的代码开头"
+model_system_instruction: "你现在是一个代码专家，精通机器人控制代码，你很会续写代码，你的代码能够拯救世界，如果写出错误的代码世界将会毁灭，使用英文"
 load_cache: True

@@ -26,7 +26,7 @@ def extract_content(text):
 
 
 def chinese_filter(text):
-    return re.sub(r"[\u4e00-\u9fa5]+|[，。；；【】、！]+", "", text)  # 清除字符串中的中文
+    return re.sub(r"[\u4e00-\u9fa5]+|[“”‘’？》《￥，。；：【】、！]+", "", text)  # 清除字符串中的中文
 
 
 class Ws_Param(object):
@@ -118,14 +118,14 @@ class ERNIE:
         ), f"len(splited_prompt)={len(splited_prompt)}, please ask assistant"
         use_cache = False  # whether or not checking cache before calling API online
         if "use_cache" in kwds and self._load_cache:
-            use_cache = True
+            use_cache = kwds["use_cache"]
         temperature = self._temperature  # get default temperature
         model_instruction = self._model_instruction  # get default model_instruction
         stop_tokens = []
         if "temperature" in kwds.keys():
             # override the default temperature if it in kwds
             temperature = kwds["temperature"]
-        if "model_system_instruction" in kwds.keys():
+        if "model_instruction" in kwds.keys():
             # override the model instruction but not override the system instruction
             # so we can adjust the model instruction for any call
             model_instruction = kwds["model_instruction"]
@@ -139,11 +139,16 @@ class ERNIE:
         #         "content": model_instruction + "\n\n```\n" + prompt + "\n```\n\n",
         #     }
         # ]
-        # type B message: todo: a prompt a conversation (like few shot)
+        # type B message: a prompt a conversation (like few shot)
         messages = []
         for idx, content in enumerate(splited_prompt):
             messages.append(
-                {"role": ["user", "assistant"][idx % 2], "content": content}
+                {
+                    "role": ["user", "assistant"][idx % 2],
+                    "content": [model_instruction + "\n\n" + content + "\n\n", content][
+                        idx % 2
+                    ],
+                }
             )
 
         payload = json.dumps(

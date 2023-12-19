@@ -1,8 +1,8 @@
 .vscode
 **/__pycache__
 src/visualizations/
-src/cache/
+src/cache
 src/achieves/
-src/configs/secret/
+src/configs/secret
 /*.py
 /code-history.txt

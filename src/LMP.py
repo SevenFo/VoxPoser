@@ -158,7 +158,9 @@ class LMP:
                 f.write(f"{to_log.strip()}\n")
         else:
             with open(self._history_file_name, "a") as f:
-                f.write(textwrap.indent(f"{to_log.strip()}\n", "    " * calling_level))
+                f.write(
+                    textwrap.indent(f"{to_log.strip()}" + "\n", "    " * calling_level)
+                )
 
         if self._debug:
             # only "execute" function performs actions in environment, so we comment it out
@@ -205,7 +207,7 @@ def merge_dicts(dicts):
 
 
 def exec_safe(code_str, gvars=None, lvars=None):
-    banned_phrases = ["import", "__"]
+    banned_phrases = ["import ", "__"]
     for phrase in banned_phrases:
         assert phrase not in code_str, "banned phrases appear in model ret"
 
