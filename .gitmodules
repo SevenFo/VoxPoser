@@ -1,0 +1,3 @@
+[submodule "src/VLMPipline"]
+	path = src/VLMPipline
+	url = https://github.com/SevenFo/VLMPipline.git
