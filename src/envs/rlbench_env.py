@@ -3,12 +3,16 @@ import numpy as np
 import open3d as o3d
 import json
 from rlbench.action_modes.action_mode import MoveArmThenGripper
-from rlbench.action_modes.arm_action_modes import ArmActionMode, EndEffectorPoseViaPlanning
+from rlbench.action_modes.arm_action_modes import (
+    ArmActionMode,
+    EndEffectorPoseViaPlanning,
+)
 from rlbench.action_modes.gripper_action_modes import Discrete, GripperActionMode
 from rlbench.environment import Environment
 import rlbench.tasks as tasks
 from pyrep.const import ObjectType
 from utils import normalize_vector, bcolors
+
 
 class CustomMoveArmThenGripper(MoveArmThenGripper):
     """
@@ -19,6 +23,7 @@ class CustomMoveArmThenGripper(MoveArmThenGripper):
     Attributes:
         _prev_arm_action (numpy.ndarray): Stores the previous arm action.
     """
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._prev_arm_action = None
@@ -28,43 +33,69 @@ class CustomMoveArmThenGripper(MoveArmThenGripper):
         arm_action = np.array(action[:arm_act_size])
         ee_action = np.array(action[arm_act_size:])
         # if the arm action is the same as the previous action, skip it
-        if self._prev_arm_action is not None and np.allclose(arm_action, self._prev_arm_action):
+        if self._prev_arm_action is not None and np.allclose(
+            arm_action, self._prev_arm_action
+        ):
             self.gripper_action_mode.action(scene, ee_action)
         else:
             try:
                 self.arm_action_mode.action(scene, arm_action)
             except Exception as e:
-                print(f'{bcolors.FAIL}[rlbench_env.py] Ignoring failed arm action; Exception: "{str(e)}"{bcolors.ENDC}')
+                print(
+                    f'{bcolors.FAIL}[rlbench_env.py] Ignoring failed arm action; Exception: "{str(e)}"{bcolors.ENDC}'
+                )
             self.gripper_action_mode.action(scene, ee_action)
         self._prev_arm_action = arm_action.copy()
 
-class VoxPoserRLBench():
-    def __init__(self, visualizer=None):
+
+class VoxPoserRLBench:
+    def __init__(self, visualizer=None, headless=False):
         """
         Initializes the VoxPoserRLBench environment.
 
         Args:
             visualizer: Visualization interface, optional.
         """
-        action_mode = CustomMoveArmThenGripper(arm_action_mode=EndEffectorPoseViaPlanning(),
-                                        gripper_action_mode=Discrete())
-        self.rlbench_env = Environment(action_mode)
+        action_mode = CustomMoveArmThenGripper(
+            arm_action_mode=EndEffectorPoseViaPlanning(), gripper_action_mode=Discrete()
+        )
+        self.rlbench_env = Environment(action_mode, headless=headless)
         self.rlbench_env.launch()
         self.task = None
 
-        self.workspace_bounds_min = np.array([self.rlbench_env._scene._workspace_minx, self.rlbench_env._scene._workspace_miny, self.rlbench_env._scene._workspace_minz])
-        self.workspace_bounds_max = np.array([self.rlbench_env._scene._workspace_maxx, self.rlbench_env._scene._workspace_maxy, self.rlbench_env._scene._workspace_maxz])
+        self.workspace_bounds_min = np.array(
+            [
+                self.rlbench_env._scene._workspace_minx,
+                self.rlbench_env._scene._workspace_miny,
+                self.rlbench_env._scene._workspace_minz,
+            ]
+        )
+        self.workspace_bounds_max = np.array(
+            [
+                self.rlbench_env._scene._workspace_maxx,
+                self.rlbench_env._scene._workspace_maxy,
+                self.rlbench_env._scene._workspace_maxz,
+            ]
+        )
         self.visualizer = visualizer
         if self.visualizer is not None:
-            self.visualizer.update_bounds(self.workspace_bounds_min, self.workspace_bounds_max)
-        self.camera_names = ['front', 'left_shoulder', 'right_shoulder', 'overhead', 'wrist']
+            self.visualizer.update_bounds(
+                self.workspace_bounds_min, self.workspace_bounds_max
+            )
+        self.camera_names = [
+            "front",
+            "left_shoulder",
+            "right_shoulder",
+            "overhead",
+            "wrist",
+        ]
         # calculate lookat vector for all cameras (for normal estimation)
         name2cam = {
-            'front': self.rlbench_env._scene._cam_front,
-            'left_shoulder': self.rlbench_env._scene._cam_over_shoulder_left,
-            'right_shoulder': self.rlbench_env._scene._cam_over_shoulder_right,
-            'overhead': self.rlbench_env._scene._cam_overhead,
-            'wrist': self.rlbench_env._scene._cam_wrist,
+            "front": self.rlbench_env._scene._cam_front,
+            "left_shoulder": self.rlbench_env._scene._cam_over_shoulder_left,
+            "right_shoulder": self.rlbench_env._scene._cam_over_shoulder_right,
+            "overhead": self.rlbench_env._scene._cam_overhead,
+            "wrist": self.rlbench_env._scene._cam_wrist,
         }
         forward_vector = np.array([0, 0, 1])
         self.lookat_vectors = {}
@@ -73,8 +104,10 @@ class VoxPoserRLBench():
             lookat = extrinsics[:3, :3] @ forward_vector
             self.lookat_vectors[cam_name] = normalize_vector(lookat)
         # load file containing object names for each task
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'task_object_names.json')
-        with open(path, 'r') as f:
+        path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "task_object_names.json"
+        )
+        with open(path, "r") as f:
             self.task_object_names = json.load(f)
 
         self._reset_task_variables()
@@ -102,20 +135,35 @@ class VoxPoserRLBench():
         if isinstance(task, str):
             task = getattr(tasks, task)
         self.task = self.rlbench_env.get_task(task)
-        self.arm_mask_ids = [obj.get_handle() for obj in self.task._robot.arm.get_objects_in_tree(exclude_base=False)]
-        self.gripper_mask_ids = [obj.get_handle() for obj in self.task._robot.gripper.get_objects_in_tree(exclude_base=False)]
+        self.arm_mask_ids = [
+            obj.get_handle()
+            for obj in self.task._robot.arm.get_objects_in_tree(exclude_base=False)
+        ]
+        self.gripper_mask_ids = [
+            obj.get_handle()
+            for obj in self.task._robot.gripper.get_objects_in_tree(exclude_base=False)
+        ]
         self.robot_mask_ids = self.arm_mask_ids + self.gripper_mask_ids
-        self.obj_mask_ids = [obj.get_handle() for obj in self.task._task.get_base().get_objects_in_tree(exclude_base=False)]
+        self.obj_mask_ids = [
+            obj.get_handle()
+            for obj in self.task._task.get_base().get_objects_in_tree(
+                exclude_base=False
+            )
+        ]
         # store (object name <-> object id) mapping for relevant task objects
         try:
             name_mapping = self.task_object_names[self.task.get_name()]
         except KeyError:
-            raise KeyError(f'Task {self.task.get_name()} not found in "envs/task_object_names.json" (hint: make sure the task and the corresponding object names are added to the file)')
+            raise KeyError(
+                f'Task {self.task.get_name()} not found in "envs/task_object_names.json" (hint: make sure the task and the corresponding object names are added to the file)'
+            )
         exposed_names = [names[0] for names in name_mapping]
         internal_names = [names[1] for names in name_mapping]
-        scene_objs = self.task._task.get_base().get_objects_in_tree(object_type=ObjectType.SHAPE,
-                                                                      exclude_base=False,
-                                                                      first_generation_only=False)
+        scene_objs = self.task._task.get_base().get_objects_in_tree(
+            object_type=ObjectType.SHAPE,
+            exclude_base=False,
+            first_generation_only=False,
+        )
         for scene_obj in scene_objs:
             if scene_obj.get_name() in internal_names:
                 exposed_name = exposed_names[internal_names.index(scene_obj.get_name())]
@@ -145,7 +193,7 @@ class VoxPoserRLBench():
             # estimate normals using o3d
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(points[-1])
-            pcd.estimate_normals()
+            pcd.estimate_normals()  # 估计每个点的法线
             cam_normals = np.asarray(pcd.normals)
             # use lookat vector to adjust normal vectors
             flip_indices = np.dot(cam_normals, self.lookat_vectors[cam]) > 0
@@ -168,6 +216,9 @@ class VoxPoserRLBench():
         obj_normals = np.asarray(pcd_downsampled.normals)
         return obj_points, obj_normals
 
+    def get_3d_obs_by_name_by_vlm():
+        pass
+
     def get_scene_3d_obs(self, ignore_robot=False, ignore_grasped_obj=False):
         """
         Retrieves the entire scene's 3D point cloud observations and colors.
@@ -189,9 +240,15 @@ class VoxPoserRLBench():
         masks = np.concatenate(masks, axis=0)
 
         # only keep points within workspace
-        chosen_idx_x = (points[:, 0] > self.workspace_bounds_min[0]) & (points[:, 0] < self.workspace_bounds_max[0])
-        chosen_idx_y = (points[:, 1] > self.workspace_bounds_min[1]) & (points[:, 1] < self.workspace_bounds_max[1])
-        chosen_idx_z = (points[:, 2] > self.workspace_bounds_min[2]) & (points[:, 2] < self.workspace_bounds_max[2])
+        chosen_idx_x = (points[:, 0] > self.workspace_bounds_min[0]) & (
+            points[:, 0] < self.workspace_bounds_max[0]
+        )
+        chosen_idx_y = (points[:, 1] > self.workspace_bounds_min[1]) & (
+            points[:, 1] < self.workspace_bounds_max[1]
+        )
+        chosen_idx_z = (points[:, 2] > self.workspace_bounds_min[2]) & (
+            points[:, 2] < self.workspace_bounds_max[2]
+        )
         points = points[(chosen_idx_x & chosen_idx_y & chosen_idx_z)]
         colors = colors[(chosen_idx_x & chosen_idx_y & chosen_idx_z)]
         masks = masks[(chosen_idx_x & chosen_idx_y & chosen_idx_z)]
@@ -273,7 +330,7 @@ class VoxPoserRLBench():
         else:
             action = np.concatenate([pose, [self.latest_action[-1]]])
         return self.apply_action(action)
-    
+
     def open_gripper(self):
         """
         Opens the gripper of the robot.
@@ -309,9 +366,13 @@ class VoxPoserRLBench():
             tuple: A tuple containing the latest observations, reward, and termination flag.
         """
         if self.latest_action is None:
-            action = np.concatenate([self.init_obs.gripper_pose, [self.init_obs.gripper_open]])
+            action = np.concatenate(
+                [self.init_obs.gripper_pose, [self.init_obs.gripper_open]]
+            )
         else:
-            action = np.concatenate([self.init_obs.gripper_pose, [self.latest_action[-1]]])
+            action = np.concatenate(
+                [self.init_obs.gripper_pose, [self.latest_action[-1]]]
+            )
         return self.apply_action(action)
 
     def get_ee_pose(self):
@@ -355,7 +416,7 @@ class VoxPoserRLBench():
         self.obj_mask_ids = None
         self.name2ids = {}  # first_generation name -> list of ids of the tree
         self.id2name = {}  # any node id -> first_generation name
-   
+
     def _update_visualizer(self):
         """
         Updates the scene in the visualizer with the latest observations.
@@ -363,9 +424,11 @@ class VoxPoserRLBench():
         Note: This function is generally called internally.
         """
         if self.visualizer is not None:
-            points, colors = self.get_scene_3d_obs(ignore_robot=False, ignore_grasped_obj=False)
+            points, colors = self.get_scene_3d_obs(
+                ignore_robot=False, ignore_grasped_obj=False
+            )
             self.visualizer.update_scene_points(points, colors)
-    
+
     def _process_obs(self, obs):
         """
         Processes the observations, specifically converts quaternion format from xyzw to wxyz.

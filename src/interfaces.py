@@ -59,12 +59,14 @@ class LMP_interface:
         """return an observation dict containing useful information about the object"""
         print("calling detect")
         if obj_name.lower() in EE_ALIAS:
+            # 如果是执行器则不需要调用模型进行检测
             obs_dict = dict()
             obs_dict["name"] = obj_name
             obs_dict["position"] = self.get_ee_pos()
             obs_dict["aabb"] = np.array([self.get_ee_pos(), self.get_ee_pos()])
             obs_dict["_position_world"] = self._env.get_ee_pos()
         elif obj_name.lower() in TABLE_ALIAS:
+            # 如果是桌子，由于检测不到桌子则直接返回一些信息
             offset_percentage = 0.1
             x_min = self._env.workspace_bounds_min[0] + offset_percentage * (
                 self._env.workspace_bounds_max[0] - self._env.workspace_bounds_min[0]
@@ -95,14 +97,14 @@ class LMP_interface:
         else:
             obs_dict = dict()
             obj_pc, obj_normal = self._env.get_3d_obs_by_name(obj_name)
-            voxel_map = self._points_to_voxel_map(obj_pc)
-            aabb_min = self._world_to_voxel(np.min(obj_pc, axis=0))
-            aabb_max = self._world_to_voxel(np.max(obj_pc, axis=0))
+            voxel_map = self._points_to_voxel_map(obj_pc) # 体素图
+            aabb_min = self._world_to_voxel(np.min(obj_pc, axis=0)) # 体素图中每个坐标轴的最小坐标 (x_min, y_min, z_min)
+            aabb_max = self._world_to_voxel(np.max(obj_pc, axis=0)) # 体素图中每个坐标轴的最大坐标 (x_max, y_max, z_max)
             obs_dict["occupancy_map"] = voxel_map  # in voxel frame
             obs_dict["name"] = obj_name
             obs_dict["position"] = self._world_to_voxel(
                 np.mean(obj_pc, axis=0)
-            )  # in voxel frame
+            )  # in voxel frame 用点云的均值代表物体的位置
             obs_dict["aabb"] = np.array([aabb_min, aabb_max])  # in voxel frame
             obs_dict["_position_world"] = np.mean(obj_pc, axis=0)  # in world frame
             obs_dict["_point_cloud_world"] = obj_pc  # in world frame

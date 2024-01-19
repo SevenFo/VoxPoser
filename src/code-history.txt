@@ -1,5 +1,5 @@
 objects = ['bin', 'rubbish', 'tomato1', 'tomato2']
-# Query: put rubbish in bin.
+# Query: throw away the trash, leaving any other objects alone.
 composer("grasp the rubbish")
 composer("back to default pose")
 composer("move to 10cm on top of the bin")
