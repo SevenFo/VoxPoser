@@ -1,5 +1,6 @@
 """Plotly-Based Visualizer"""
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import numpy as np
 import os
 import datetime
@@ -18,6 +19,7 @@ class ValueMapVisualizer:
         self.quality = config["quality"]
         self.update_quality(self.quality)
         self.map_size = config["map_size"]
+        self.objects_points = []
 
     def update_bounds(self, lower, upper):
         self.workspace_bounds_min = lower
@@ -80,8 +82,28 @@ class ValueMapVisualizer:
         assert colors.dtype == np.uint8
         self.scene_points = (points, colors)
 
+    def add_object_points(self, points, label):
+        points = points.astype(np.float16)
+        self.objects_points.append((points, label))
+
+    def update_depth_map(self, depth_map):
+        self.depth_map = depth_map
+
+    def update_mask(self, mask):
+        self.mask = mask
+
     def visualize(self, info, show=False, save=True):
-        """visualize the path and relevant info using plotly"""
+        """
+        Visualize the path and relevant info using plotly.
+
+        Args:
+            info (dict): Dictionary containing the relevant information for visualization.
+            show (bool, optional): Whether to display the visualization. Defaults to False.
+            save (bool, optional): Whether to save the visualization. Defaults to True.
+
+        Returns:
+            go.Figure: The plotly figure object representing the visualization.
+        """
         planner_info = info["planner_info"]
         waypoints_world = np.array([p[0] for p in info["traj_world"]])
         start_pos_world = info["start_pos_world"]
@@ -89,7 +111,6 @@ class ValueMapVisualizer:
         waypoints_world = np.concatenate(
             [start_pos_world[None, ...], waypoints_world], axis=0
         )
-
         fig_data = []
         # plot path
         # add marker to path waypoints
@@ -116,16 +137,19 @@ class ValueMapVisualizer:
                 )
             )
         if planner_info is not None:
-            # plot costmap
+            # plot costmap costmap = (target_map * self.config.target_map_weight+ obstacle_map * self.config.obstacle_map_weight)
             if "costmap" in planner_info:
+                # Downsample the costmap, :: means sample points every downsample_ratio
                 costmap = planner_info["costmap"][
                     :: self.downsample_ratio,
                     :: self.downsample_ratio,
                     :: self.downsample_ratio,
                 ]
+                # Calculate the skip ratio for grid points
                 skip_ratio = (self.workspace_bounds_max - self.workspace_bounds_min) / (
                     self.map_size / self.downsample_ratio
                 )
+                # Generate the grid points, mgrid is similar to meshgrid, which takes the start, end, and step size for each dimension
                 x, y, z = np.mgrid[
                     self.workspace_bounds_min[0] : self.workspace_bounds_max[
                         0
@@ -138,9 +162,11 @@ class ValueMapVisualizer:
                     ] : skip_ratio[2],
                 ]
                 grid_shape = costmap.shape
+                # Trim the grid points to match the costmap shape
                 x = x[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
                 y = y[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
                 z = z[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
+                # Add the costmap as a volume plot
                 fig_data.append(
                     go.Volume(
                         x=x.flatten(),
@@ -154,6 +180,7 @@ class ValueMapVisualizer:
                         colorscale="Jet",
                         showlegend=True,
                         showscale=False,
+                        name="costmap",
                     )
                 )
             # plot start position
@@ -191,11 +218,11 @@ class ValueMapVisualizer:
             # resample to reduce the number of points
             if scene_points.shape[0] > self.max_scene_points:
                 resample_idx = np.random.choice(
-                    scene_points.shape[0],
-                    min(scene_points.shape[0], self.max_scene_points),
+                    obj_points.shape[0],
+                    min(obj_points.shape[0], self.max_scene_points),
                     replace=False,
                 )
-                scene_points = scene_points[resample_idx]
+                obj_points = obj_points[resample_idx]
                 if scene_point_colors is not None:
                     scene_point_colors = scene_point_colors[resample_idx]
             if scene_point_colors is None:
@@ -212,8 +239,26 @@ class ValueMapVisualizer:
                     marker=dict(size=3, color=scene_point_colors, opacity=1.0),
                 )
             )
-
-        fig = go.Figure(data=fig_data)
+        # fig = go.Figure(data=fig_data)
+        fig = make_subplots(
+            rows=2,
+            cols=2,
+            specs=[
+                [{"type": "scene", "rowspan": 2}, {"type": "scene"}],
+                [
+                    None,
+                    {"type": "xy"},
+                ],
+            ],
+            subplot_titles=[
+                "display",
+                "objects cloudpoints",
+                None,
+                "mask and depth map",
+            ],
+        )
+        for trace in fig_data:
+            fig.add_trace(trace, row=1, col=1)
 
         # set bounds and ratio
         fig.update_layout(
@@ -249,11 +294,48 @@ class ValueMapVisualizer:
                 zaxis=dict(
                     showgrid=False, showticklabels=False, title="", visible=False
                 ),
-            )
+            ),
         )
 
         # set background color as white
         fig.update_layout(template="none")
+
+        fig.add_trace(
+            go.Scatter(
+                x=[1, 2, 3],
+                y=[4, 5, 6],
+                mode="markers",
+                name="mask figure",
+                marker=dict(size=4, color="green"),
+            ),
+            row=2,
+            col=2,
+        )
+
+        # add objects_points
+        for obj_points, label in self.objects_points:
+            # resample to reduce the number of points
+            if obj_points.shape[0] > self.max_scene_points:
+                resample_idx = np.random.choice(
+                    obj_points.shape[0],
+                    min(obj_points.shape[0], self.max_scene_points),
+                    replace=False,
+                )
+                obj_points = obj_points[resample_idx]
+            # add scene points
+            fig.add_trace(
+                go.Scatter3d(
+                    x=obj_points[:, 0],
+                    y=obj_points[:, 1],
+                    z=obj_points[:, 2],
+                    mode="markers",
+                    name=label,
+                    marker=dict(size=3, color="blue", opacity=1.0),
+                ),
+                row=1,
+                col=2,
+            )
+
 
         # save and show
         if save and self.save_dir is not None:

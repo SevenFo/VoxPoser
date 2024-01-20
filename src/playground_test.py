@@ -10,6 +10,8 @@ import numpy as np
 from rlbench import tasks
 import engine_interfaces
 
+from VLMPipline.VLM import VLM
+
 openai.api_key = None  # set your API key here
 
 # load other config file (LMP, visualization, visual env, etc.)
@@ -23,13 +25,31 @@ erniev4_engine_config = load_config(
 )
 print(erniev4_engine_config)
 
+# vlm config
+owlv2_model_path = "pretrained_models/google-owlv2-large-patch14-finetuned"
+owlv2_model_path = "pretrained_models/google-owlv2-base-patch16-ensemble"
+sam_model_path = "pretrained_models/facebook-sam-vit-huge"
+sam_model_path = "pretrained_models/facebook-sam-vit-base"
+xmem_model_path = "pretrained_models/XMem.pth"
+resnet_18_path = "pretrained_models/resnet18.pth"
+resnet_50_path = "pretrained_models/resnet50.pth"
+
+vlmpipeline = VLM(
+    owlv2_model_path,
+    sam_model_path,
+    xmem_model_path,
+    resnet_18_path,
+    resnet_50_path,
+    "cpu",
+)
+
 # uncomment this if you'd like to change the language model (e.g., for faster speed or lower cost)
 # for lmp_name, cfg in config['lmp_config']['lmps'].items():
 #     cfg['model'] = 'gpt-3.5-turbo'
 
 # initialize env and voxposer ui
 visualizer = ValueMapVisualizer(config["visualizer"])
-env = VoxPoserRLBench(visualizer=visualizer, headless=True)
+env = VoxPoserRLBench(visualizer=visualizer, headless=True, vlmpipeline=vlmpipeline)
 engine_sparkv3 = getattr(engine_interfaces, sparkv3_engine_config["type"])(
     **sparkv3_engine_config
 )  # engine initialization
@@ -61,11 +81,13 @@ lmp_env = LMP_interface(
     env, lmp_env_config, controller_config, planner_config, env_name=env_name
 )
 lmp_env.detect("rubbish")
-set_lmp_objects(
-    lmps, env.get_object_names()
-)  # set the object names to be used by voxposer
 
-# 关于task description从哪里来的: rlbench 内置了一些task，并且这些task有多种描述，ref:https://github.com/stepjam/RLBench/blob/master/tutorials/simple_task.md
-instruction = np.random.choice(descriptions)
-# instruction = "throw away the trash, leaving any other objects alone"
-voxposer_ui(instruction)
+
+# set_lmp_objects(
+#     lmps, env.get_object_names()
+# )  # set the object names to be used by voxposer
+
+# # 关于task description从哪里来的: rlbench 内置了一些task，并且这些task有多种描述，ref:https://github.com/stepjam/RLBench/blob/master/tutorials/simple_task.md
+# instruction = np.random.choice(descriptions)
+# # instruction = "throw away the trash, leaving any other objects alone"
+# voxposer_ui(instruction)

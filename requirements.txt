@@ -4,7 +4,8 @@ plotly
 transforms3d
 open3d
 accelerate
-opencv-python
+# opencv-python # for local with head
+opencv-python-headless # for server
 progressbar2
 gdown
 gitpython

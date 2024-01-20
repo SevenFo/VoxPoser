@@ -14,6 +14,8 @@ from scipy.ndimage import distance_transform_edt
 import transforms3d
 from controllers import Controller
 
+from envs.rlbench_env import VoxPoserRLBench
+
 # creating some aliases for end effector and table in case LLMs refer to them differently (but rarely this happens)
 EE_ALIAS = ["ee", "endeffector", "end_effector", "end effector", "gripper", "hand"]
 TABLE_ALIAS = [
@@ -30,7 +32,12 @@ TABLE_ALIAS = [
 
 class LMP_interface:
     def __init__(
-        self, env, lmp_config, controller_config, planner_config, env_name="rlbench"
+        self,
+        env: VoxPoserRLBench,
+        lmp_config,
+        controller_config,
+        planner_config,
+        env_name="rlbench",
     ):
         self._env = env
         self._env_name = env_name
@@ -57,7 +64,9 @@ class LMP_interface:
 
     def detect(self, obj_name):
         """return an observation dict containing useful information about the object"""
-        print("calling detect")
+        enable_vlm = False if self._env.vlm == None else True
+        enable_vlm = False
+        print(f"calling detect VLM enable: {enable_vlm}")
         if obj_name.lower() in EE_ALIAS:
             # 如果是执行器则不需要调用模型进行检测
             obs_dict = dict()
@@ -96,10 +105,20 @@ class LMP_interface:
             )
         else:
             obs_dict = dict()
-            obj_pc, obj_normal = self._env.get_3d_obs_by_name(obj_name)
-            voxel_map = self._points_to_voxel_map(obj_pc) # 体素图
-            aabb_min = self._world_to_voxel(np.min(obj_pc, axis=0)) # 体素图中每个坐标轴的最小坐标 (x_min, y_min, z_min)
-            aabb_max = self._world_to_voxel(np.max(obj_pc, axis=0)) # 体素图中每个坐标轴的最大坐标 (x_max, y_max, z_max)
+            obj_pc, obj_normal = (
+                self._env.get_3d_obs_by_name_by_vlm(obj_name)
+                if enable_vlm
+                else self._env.get_3d_obs_by_name(obj_name)
+            )
+            if self._env.visualizer is not None:
+                self._env.visualizer.add_object_points(obj_pc, obj_name)
+            voxel_map = self._points_to_voxel_map(obj_pc)  # 体素图
+            aabb_min = self._world_to_voxel(
+                np.min(obj_pc, axis=0)
+            )  # 体素图中每个坐标轴的最小坐标 (x_min, y_min, z_min)
+            aabb_max = self._world_to_voxel(
+                np.max(obj_pc, axis=0)
+            )  # 体素图中每个坐标轴的最大坐标 (x_max, y_max, z_max)
             obs_dict["occupancy_map"] = voxel_map  # in voxel frame
             obs_dict["name"] = obj_name
             obs_dict["position"] = self._world_to_voxel(

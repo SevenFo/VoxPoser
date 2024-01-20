@@ -6,3 +6,4 @@ src/achieves/
 src/configs/secret
 /*.py
 /code-history.txt
+src/pretrained_models/

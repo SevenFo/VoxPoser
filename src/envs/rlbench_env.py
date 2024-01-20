@@ -13,6 +13,10 @@ import rlbench.tasks as tasks
 from pyrep.const import ObjectType
 from utils import normalize_vector, bcolors
 
+from visualizers import ValueMapVisualizer
+from VLMPipline.VLM import VLM
+from VLMPipline.utils import convert_depth_to_pointcloud
+
 
 class CustomMoveArmThenGripper(MoveArmThenGripper):
     """
@@ -49,12 +53,14 @@ class CustomMoveArmThenGripper(MoveArmThenGripper):
 
 
 class VoxPoserRLBench:
-    def __init__(self, visualizer=None, headless=False):
+    def __init__(self, visualizer:ValueMapVisualizer=None, headless=False, vlmpipeline: VLM = None):
         """
         Initializes the VoxPoserRLBench environment.
 
         Args:
             visualizer: Visualization interface, optional.
+            headless (bool, optional): whether to run the environment in headless mode.
+            VILMPipeline (optional): VILMPipeline object, input frame and objects output object masks.
         """
         action_mode = CustomMoveArmThenGripper(
             arm_action_mode=EndEffectorPoseViaPlanning(), gripper_action_mode=Discrete()
@@ -62,6 +68,7 @@ class VoxPoserRLBench:
         self.rlbench_env = Environment(action_mode, headless=headless)
         self.rlbench_env.launch()
         self.task = None
+        self.vlm = vlmpipeline
 
         self.workspace_bounds_min = np.array(
             [
@@ -99,10 +106,26 @@ class VoxPoserRLBench:
         }
         forward_vector = np.array([0, 0, 1])
         self.lookat_vectors = {}
+        self.camera_params = (
+            {}
+        )  # different camera has different params, key: camera name, value: params
         for cam_name in self.camera_names:
             extrinsics = name2cam[cam_name].get_matrix()
             lookat = extrinsics[:3, :3] @ forward_vector
             self.lookat_vectors[cam_name] = normalize_vector(lookat)
+            self.camera_params.update(
+                {
+                    cam_name: {
+                        "extrinsic_params": extrinsics,
+                        "intrinsic_params": name2cam[cam_name].get_intrinsic_matrix(),
+                        "far_near": (
+                            name2cam[cam_name].get_far_clipping_plane(),
+                            name2cam[cam_name].get_near_clipping_plane(),
+                        ),
+                    }
+                }
+            )
+        print(f"{bcolors.OKGREEN}Camera parameters:{bcolors.ENDC} {self.camera_params}")
         # load file containing object names for each task
         path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "task_object_names.json"
@@ -157,8 +180,8 @@ class VoxPoserRLBench:
             raise KeyError(
                 f'Task {self.task.get_name()} not found in "envs/task_object_names.json" (hint: make sure the task and the corresponding object names are added to the file)'
             )
-        exposed_names = [names[0] for names in name_mapping]
-        internal_names = [names[1] for names in name_mapping]
+        exposed_names = [names[0] for names in name_mapping]  # 外部名称
+        internal_names = [names[1] for names in name_mapping]  # 仿真环境内部对该物品的名称
         scene_objs = self.task._task.get_base().get_objects_in_tree(
             object_type=ObjectType.SHAPE,
             exclude_base=False,
@@ -172,6 +195,8 @@ class VoxPoserRLBench:
                 for child in scene_obj.get_objects_in_tree():
                     self.name2ids[exposed_name].append(child.get_handle())
                     self.id2name[child.get_handle()] = exposed_name
+        self.name2label = {name: i for i, name in enumerate(exposed_names)}
+        self.label2name = {i: name for i, name in enumerate(exposed_names)}
 
     def get_3d_obs_by_name(self, query_name):
         """
@@ -216,8 +241,60 @@ class VoxPoserRLBench:
         obj_normals = np.asarray(pcd_downsampled.normals)
         return obj_points, obj_normals
 
-    def get_3d_obs_by_name_by_vlm():
-        pass
+    def get_3d_obs_by_name_by_vlm(self, query_name, cameras=None):
+        """
+        Retrieves 3D point cloud observations and normals of an object by its name by VLM
+
+        Args:
+            query_name (str): The name of the object to query.
+            cameras (list): list of camera names, if None, use all cameras
+        Returns:
+            tuple: A tuple containing object points and object normals.
+        """
+        assert query_name in self.name2label, f"Unknown object name: {query_name}"
+        points, masks, normals = [], [], []
+        if cameras is None:
+            cameras = self.camera_names
+        for cam in self.camera_names:
+            depth_frame = getattr(self.latest_obs, f"{cam}_depth")
+            mask_frame = self.latest_mask[cam]
+            point = convert_depth_to_pointcloud(
+                depth_image=depth_frame,
+                extrinsic_params=self.camera_params[cam]["extrinsic_params"],
+                camera_intrinsics=self.camera_params[cam]["intrinsic_params"],
+                clip_far=self.camera_params[cam]["far_near"][0],
+                clip_near=self.camera_params[cam]["far_near"][1],
+            )
+            points.append(point.reshape(-1, 3))
+            masks.append(
+                mask_frame.reshape(-1)
+            )  # it contain the mask of different type of object
+            # estimate normals using o3d
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(points[-1])
+            pcd.estimate_normals()  # 估计每个点的法线
+            cam_normals = np.asarray(pcd.normals)
+            # use lookat vector to adjust normal vectors
+            flip_indices = np.dot(cam_normals, self.lookat_vectors[cam]) > 0
+            cam_normals[flip_indices] *= -1
+            normals.append(cam_normals)
+        points = np.concatenate(points, axis=0)
+        masks = np.concatenate(masks, axis=0)
+        normals = np.concatenate(normals, axis=0)
+        # get object points
+        object_label = self.name2label[query_name]
+        obj_points = points[np.isin(masks, object_label)]
+        if len(obj_points) == 0:
+            raise ValueError(f"Object {query_name} not found in the scene")
+        obj_normals = normals[np.isin(masks, object_label)]
+        # voxel downsample using o3d
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(obj_points)
+        pcd.normals = o3d.utility.Vector3dVector(obj_normals)
+        pcd_downsampled = pcd.voxel_down_sample(voxel_size=0.001)
+        obj_points = np.asarray(pcd_downsampled.points)
+        obj_normals = np.asarray(pcd_downsampled.normals)
+        return obj_points, obj_normals
 
     def get_scene_3d_obs(self, ignore_robot=False, ignore_grasped_obj=False):
         """
@@ -281,12 +358,25 @@ class VoxPoserRLBench:
         Returns:
             tuple: A tuple containing task descriptions and initial observations.
         """
+        # todo
         assert self.task is not None, "Please load a task first"
         self.task.sample_variation()
         descriptions, obs = self.task.reset()
         obs = self._process_obs(obs)
         self.init_obs = obs
         self.latest_obs = obs
+        self.latest_mask = {}
+        rgb_frames = []  # in c w h
+        for cam in self.camera_names:
+            rgb_frames.append(
+                getattr(self.latest_obs, f"{cam}_rgb").transpose([2, 0, 1])
+            )
+        target_objects = list(self.name2ids.keys())
+        self.target_objects_labels = list(range(len(target_objects)))
+        self.vlm.process_first_frame(
+            target_objects, rgb_frames[0], verbose=True, resize_to=64
+        ) if self.vlm is not None else None
+
         self._update_visualizer()
         return descriptions, obs
 
@@ -308,6 +398,18 @@ class VoxPoserRLBench:
         self.latest_reward = reward
         self.latest_terminate = terminate
         self.latest_action = action
+        rgb_frames = []  # in c w h
+        for cam in self.camera_names:
+            rgb_frames.append(
+                getattr(self.latest_obs, f"{cam}_rgb").transpose([2, 0, 1])
+            )
+        self.latest_mask[0] = (
+            self.vlm.process_frame(
+                rgb_frames[0], verbose=True, release_video_memory=True
+            )
+            if self.vlm is not None
+            else None
+        )
         self._update_visualizer()
         grasped_objects = self.rlbench_env._scene.robot.gripper.get_grasped_objects()
         if len(grasped_objects) > 0:
@@ -416,6 +518,8 @@ class VoxPoserRLBench:
         self.obj_mask_ids = None
         self.name2ids = {}  # first_generation name -> list of ids of the tree
         self.id2name = {}  # any node id -> first_generation name
+        self.name2label = {}  # first_generation name -> label
+        self.label2name = {}  # label -> first_generation name
 
     def _update_visualizer(self):
         """
