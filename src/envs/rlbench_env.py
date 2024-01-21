@@ -1,4 +1,4 @@
-import os
+import os, re, warnings
 import numpy as np
 import open3d as o3d
 import json
@@ -55,7 +55,12 @@ class CustomMoveArmThenGripper(MoveArmThenGripper):
 
 
 class VoxPoserRLBench:
-    def __init__(self, visualizer:ValueMapVisualizer=None, headless=False, vlmpipeline: VLM = None):
+    def __init__(
+        self,
+        visualizer: ValueMapVisualizer = None,
+        headless=False,
+        vlmpipeline: VLM = None,
+    ):
         """
         Initializes the VoxPoserRLBench environment.
 
@@ -67,9 +72,25 @@ class VoxPoserRLBench:
         action_mode = CustomMoveArmThenGripper(
             arm_action_mode=EndEffectorPoseViaPlanning(), gripper_action_mode=Discrete()
         )
-        cam_config = CameraConfig(rgb=True,rgb_noise=None,depth=True,depth_noise=None,point_cloud=True,mask=True,image_size=(480,480))
-        obs_config = ObservationConfig(left_shoulder_camera=cam_config,right_shoulder_camera=cam_config,overhead_camera=cam_config,wrist_camera=cam_config,front_camera=cam_config)
-        self.rlbench_env = Environment(action_mode, headless=headless,obs_config=obs_config)
+        cam_config = CameraConfig(
+            rgb=True,
+            rgb_noise=None,
+            depth=True,
+            depth_noise=None,
+            point_cloud=True,
+            mask=True,
+            image_size=(480, 480),
+        )
+        obs_config = ObservationConfig(
+            left_shoulder_camera=cam_config,
+            right_shoulder_camera=cam_config,
+            overhead_camera=cam_config,
+            wrist_camera=cam_config,
+            front_camera=cam_config,
+        )
+        self.rlbench_env = Environment(
+            action_mode, headless=headless, obs_config=obs_config
+        )
         self.rlbench_env.launch()
         self.task = None
         self.vlm = vlmpipeline
@@ -199,8 +220,20 @@ class VoxPoserRLBench:
                 for child in scene_obj.get_objects_in_tree():
                     self.name2ids[exposed_name].append(child.get_handle())
                     self.id2name[child.get_handle()] = exposed_name
-        self.name2label = {name: i for i, name in enumerate(exposed_names)}
-        self.label2name = {i: name for i, name in enumerate(exposed_names)}
+        self.target_objects = list(
+            set(re.sub(r"\d+", "", name) for name in self.name2ids.keys())
+        )
+        print(f"we only process these objects: {self.target_objects}")
+        # set max instances for all object for category_multiplier
+        self.category_multiplier = 100  # which means the instance number of each object categery is less than 100
+        # it should be attention the category label is different from the object label
+        # object label = (category label + 1) * category_multiplier + instance id as 0 represent background
+        self.name2categerylabel = {
+            name: i for i, name in enumerate(self.target_objects)
+        }
+        self.categerylabel2name = {
+            i: name for i, name in enumerate(self.target_objects)
+        }
 
     def get_3d_obs_by_name(self, query_name):
         """
@@ -255,7 +288,7 @@ class VoxPoserRLBench:
         Returns:
             tuple: A tuple containing object points and object normals.
         """
-        assert query_name in self.name2label, f"Unknown object name: {query_name}"
+        assert query_name in self.target_objects, f"Unknown object name: {query_name}"
         points, masks, normals = [], [], []
         if cameras is None:
             cameras = self.camera_names
@@ -282,24 +315,46 @@ class VoxPoserRLBench:
             flip_indices = np.dot(cam_normals, self.lookat_vectors[cam]) > 0
             cam_normals[flip_indices] *= -1
             normals.append(cam_normals)
-            break # for test
+            break  # for test
         points = np.concatenate(points, axis=0)
-        masks = np.concatenate(masks, axis=0)
+        masks = np.concatenate(masks, axis=0)  # [0,101,102,201,202,0,0,0,301]
+        categery_masks = (
+            masks.astype(np.int32) // self.category_multiplier
+        )  # [0,1,1,2,2,0,0,0,3]
         normals = np.concatenate(normals, axis=0)
         # get object points
-        object_label = self.name2label[query_name]
-        obj_points = points[np.isin(masks, object_label)]
-        if len(obj_points) == 0:
-            raise ValueError(f"Object {query_name} not found in the scene")
-        obj_normals = normals[np.isin(masks, object_label)]
-        # voxel downsample using o3d
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(obj_points)
-        pcd.normals = o3d.utility.Vector3dVector(obj_normals)
-        pcd_downsampled = pcd.voxel_down_sample(voxel_size=0.001)
-        obj_points = np.asarray(pcd_downsampled.points)
-        obj_normals = np.asarray(pcd_downsampled.normals)
-        return obj_points, obj_normals
+        category_label = self.name2categerylabel[query_name]  # 1
+        # objs_mask: [0,101,102,0,0,0,0,0,0]
+        masks[~np.isin(categery_masks, category_label)] = 0  # [0,101,102,0,0,0,0,0,0]
+        if np.any(masks):
+            # which masks == [0,0,0,0,0,0,0,0,0] if category_label == 4
+            warnings.warn(f"Object {query_name} not found in the scene")
+            return None
+        object_instance_label = np.unique(np.mod(masks, self.category_multiplier))[
+            1:
+        ]  # remove the background # [1,2] which measn there are two instances of this object
+        assert (
+            len(object_instance_label) > 0
+        ), f"Object {query_name} not found in the scene"
+        objs_points = []
+        objs_normals = []
+        for obj_ins_id in object_instance_label:
+            obj_mask = (
+                masks == obj_ins_id + self.category_multiplier * category_label
+            )  # [False,True,False,False,False,False,False,False,False] for first loop
+            obj_points = points[obj_mask]
+            obj_normals = normals[obj_mask]
+            # voxel downsample using o3d
+            pcd = o3d.geometry.PointCloud()
+            pcd.points = o3d.utility.Vector3dVector(obj_points)
+            pcd.normals = o3d.utility.Vector3dVector(obj_normals)
+            pcd_downsampled = pcd.voxel_down_sample(voxel_size=0.001)
+            obj_points = np.asarray(pcd_downsampled.points)
+            obj_normals = np.asarray(pcd_downsampled.normals)
+            objs_points.append(obj_points)
+            objs_normals.append(obj_normals)
+        print(f"we find {len(objs_points)} instances of {query_name}")
+        return objs_points, objs_normals
 
     def get_scene_3d_obs(self, ignore_robot=False, ignore_grasped_obj=False):
         """
@@ -373,14 +428,18 @@ class VoxPoserRLBench:
         self.latest_mask = {}
         rgb_frames = {}  # in c w h
         for cam in self.camera_names:
-            rgb_frames[cam] = (
-                getattr(self.latest_obs, f"{cam}_rgb").transpose([2, 0, 1])
+            rgb_frames[cam] = getattr(self.latest_obs, f"{cam}_rgb").transpose(
+                [2, 0, 1]
             )
             target_objects = list(self.name2ids.keys())
             self.target_objects_labels = list(range(len(target_objects)))
-            self.latest_mask[cam] = self.vlm.process_first_frame(
-                target_objects, rgb_frames[cam], verbose=True, resize_to=480
-            ) if self.vlm is not None else None
+            self.latest_mask[cam] = (
+                self.vlm.process_first_frame(
+                    target_objects, rgb_frames[cam], verbose=True
+                )
+                if self.vlm is not None
+                else None
+            )
             break
 
         self._update_visualizer()
@@ -406,9 +465,7 @@ class VoxPoserRLBench:
         self.latest_action = action
         rgb_frames = {}  # in c w h
         for cam in self.camera_names:
-            rgb_frames[cam](
-                getattr(self.latest_obs, f"{cam}_rgb").transpose([2, 0, 1])
-            )
+            rgb_frames[cam](getattr(self.latest_obs, f"{cam}_rgb").transpose([2, 0, 1]))
             self.latest_mask[cam] = (
                 self.vlm.process_frame(
                     rgb_frames[cam], verbose=True, release_video_memory=True
@@ -525,8 +582,8 @@ class VoxPoserRLBench:
         self.obj_mask_ids = None
         self.name2ids = {}  # first_generation name -> list of ids of the tree
         self.id2name = {}  # any node id -> first_generation name
-        self.name2label = {}  # first_generation name -> label
-        self.label2name = {}  # label -> first_generation name
+        self.name2categerylabel = {}  # first_generation name -> label
+        self.categerylabel2name = {}  # label -> first_generation name
 
     def _update_visualizer(self):
         """
