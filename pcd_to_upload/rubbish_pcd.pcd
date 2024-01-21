@@ -1,13 +1,3 @@
-# .PCD v0.7 - Point Cloud Data file format
-VERSION 0.7
-FIELDS x y z
-SIZE 4 4 4
-TYPE F F F
-COUNT 1 1 1
-WIDTH 23
-HEIGHT 1
-VIEWPOINT 0 0 0 1 0 0 0
-POINTS 23
-DATA binary
-<(«?Âíà:ÜÉ?Q)«?Á;;kÉ?A(«?zÑ6;#É?.!«?)ÆÒ:bÉ?#«?Ee;×É?ÿ«?;Ì:0É?×(«?À;I%É?­«?,‡;TÉ?X+«?¡;µÉ?7«?+A;„É?³«?ð=Ó:žVÉ?Ù«?ÚÀ:‚KÉ?„Ýª?_;s<É?¦«?üÃ?;VÉ?
-ßª?µ\M;¿;É?Ï«?¬´E;/É?&ôª?¦Ô:C1É?_«?S3;ŸEÉ?Íàª?Î¾Õ:î:É?µòª?thM;2É?›«?èÝM;4KÉ?€ôª?Ò»;1É?†«?½4;¸/É?
+version https://git-lfs.github.com/spec/v1
+oid sha256:bdcfd02498ee2019f00805678a42de5d55dff1bf649ef4ebb0803ad391c9ea98
+size 442
