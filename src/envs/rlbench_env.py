@@ -9,10 +9,12 @@ from rlbench.action_modes.arm_action_modes import (
 )
 from rlbench.action_modes.gripper_action_modes import Discrete, GripperActionMode
 from rlbench.environment import Environment
+from rlbench.observation_config import ObservationConfig, CameraConfig
 import rlbench.tasks as tasks
 from pyrep.const import ObjectType
-from utils import normalize_vector, bcolors
 
+
+from utils import normalize_vector, bcolors
 from visualizers import ValueMapVisualizer
 from VLMPipline.VLM import VLM
 from VLMPipline.utils import convert_depth_to_pointcloud
@@ -65,7 +67,9 @@ class VoxPoserRLBench:
         action_mode = CustomMoveArmThenGripper(
             arm_action_mode=EndEffectorPoseViaPlanning(), gripper_action_mode=Discrete()
         )
-        self.rlbench_env = Environment(action_mode, headless=headless)
+        cam_config = CameraConfig(rgb=True,rgb_noise=None,depth=True,depth_noise=None,point_cloud=True,mask=True,image_size=(480,480))
+        obs_config = ObservationConfig(left_shoulder_camera=cam_config,right_shoulder_camera=cam_config,overhead_camera=cam_config,wrist_camera=cam_config,front_camera=cam_config)
+        self.rlbench_env = Environment(action_mode, headless=headless,obs_config=obs_config)
         self.rlbench_env.launch()
         self.task = None
         self.vlm = vlmpipeline
@@ -278,6 +282,7 @@ class VoxPoserRLBench:
             flip_indices = np.dot(cam_normals, self.lookat_vectors[cam]) > 0
             cam_normals[flip_indices] *= -1
             normals.append(cam_normals)
+            break # for test
         points = np.concatenate(points, axis=0)
         masks = np.concatenate(masks, axis=0)
         normals = np.concatenate(normals, axis=0)
@@ -366,16 +371,17 @@ class VoxPoserRLBench:
         self.init_obs = obs
         self.latest_obs = obs
         self.latest_mask = {}
-        rgb_frames = []  # in c w h
+        rgb_frames = {}  # in c w h
         for cam in self.camera_names:
-            rgb_frames.append(
+            rgb_frames[cam] = (
                 getattr(self.latest_obs, f"{cam}_rgb").transpose([2, 0, 1])
             )
-        target_objects = list(self.name2ids.keys())
-        self.target_objects_labels = list(range(len(target_objects)))
-        self.vlm.process_first_frame(
-            target_objects, rgb_frames[0], verbose=True, resize_to=64
-        ) if self.vlm is not None else None
+            target_objects = list(self.name2ids.keys())
+            self.target_objects_labels = list(range(len(target_objects)))
+            self.latest_mask[cam] = self.vlm.process_first_frame(
+                target_objects, rgb_frames[cam], verbose=True, resize_to=480
+            ) if self.vlm is not None else None
+            break
 
         self._update_visualizer()
         return descriptions, obs
@@ -398,18 +404,19 @@ class VoxPoserRLBench:
         self.latest_reward = reward
         self.latest_terminate = terminate
         self.latest_action = action
-        rgb_frames = []  # in c w h
+        rgb_frames = {}  # in c w h
         for cam in self.camera_names:
-            rgb_frames.append(
+            rgb_frames[cam](
                 getattr(self.latest_obs, f"{cam}_rgb").transpose([2, 0, 1])
             )
-        self.latest_mask[0] = (
-            self.vlm.process_frame(
-                rgb_frames[0], verbose=True, release_video_memory=True
+            self.latest_mask[cam] = (
+                self.vlm.process_frame(
+                    rgb_frames[cam], verbose=True, release_video_memory=True
+                )
+                if self.vlm is not None
+                else None
             )
-            if self.vlm is not None
-            else None
-        )
+            break
         self._update_visualizer()
         grasped_objects = self.rlbench_env._scene.robot.gripper.get_grasped_objects()
         if len(grasped_objects) > 0:

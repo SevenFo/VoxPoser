@@ -65,7 +65,7 @@ class LMP_interface:
     def detect(self, obj_name):
         """return an observation dict containing useful information about the object"""
         enable_vlm = False if self._env.vlm == None else True
-        enable_vlm = False
+        # enable_vlm = False
         print(f"calling detect VLM enable: {enable_vlm}")
         if obj_name.lower() in EE_ALIAS:
             # 如果是执行器则不需要调用模型进行检测

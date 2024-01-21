@@ -7,3 +7,6 @@ src/configs/secret
 /*.py
 /code-history.txt
 src/pretrained_models/
+*.tar.gz
+.ipynb_checkpoints/
+.virtual_documents/
