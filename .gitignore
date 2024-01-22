@@ -10,3 +10,4 @@ src/pretrained_models/
 *.tar.gz
 .ipynb_checkpoints/
 .virtual_documents/
+*.pcd

@@ -120,17 +120,17 @@ class ERNIE:
         if "use_cache" in kwds and self._load_cache:
             use_cache = kwds["use_cache"]
         temperature = self._temperature  # get default temperature
-        model_instruction = self._model_instruction  # get default model_instruction
         stop_tokens = []
-        if "temperature" in kwds.keys():
-            # override the default temperature if it in kwds
-            temperature = kwds["temperature"]
+        model_instruction = self._model_instruction  # get default model_instruction
         if "model_instruction" in kwds.keys():
             # override the model instruction but not override the system instruction
             # so we can adjust the model instruction for any call
             model_instruction = kwds["model_instruction"]
         if "stop" in kwds.keys():
             stop_tokens = kwds["stop"]
+        if "temperature" in kwds.keys():
+            # override the default temperature if it in kwds
+            temperature = kwds["temperature"]
 
         # type A message: a conversation contains all the prompt
         # messages = [
@@ -202,6 +202,9 @@ class Spark:
         # kwargs may contain appid,api_key,api_secret,url,doman
         self._full_name = kwargs["type"] + kwargs["version"]
         self._appid = kwargs["secret"]["appid"]
+        self._model_instruction = kwargs[
+            "model_instruction"
+        ]  # default model instruction
         self._params = Ws_Param(
             APPID=self._appid,
             APIKey=kwargs["secret"]["api_key"],
@@ -266,17 +269,31 @@ class Spark:
 
     def __call__(self, **kwargs):
         self.answer = ""
-        assert "messages" in kwargs.keys(), "engine call kwargs not contain messages"
-        # add other params
+        assert "prompt" in kwargs.keys(), "engine call kwargs not contain messages"
+        prompt, splited_prompt = kwargs["prompt"]        # add other params
         if "max_token" in kwargs.keys():
             self._max_tokens = kwargs["max_tokens"]
-        for m in kwargs["messages"]:
-            assert (
-                "role" in m.keys() and "content" in m.keys()
-            ), "messages not contain role or content"
-            if not (m["role"] == "user" or m["role"] == "assistant"):
-                continue
-            self.message.append(m)
+        # for m in kwargs["prompt"]:
+        #     assert (
+        #         "role" in m.keys() and "content" in m.keys()
+        #     ), "messages not contain role or content"
+        #     if not (m["role"] == "user" or m["role"] == "assistant"):
+        #         continue
+        #     self.message.append(m)
+        model_instruction = self._model_instruction  # get default model_instruction
+        if "model_instruction" in kwargs.keys():
+            # override the model instruction but not override the system instruction
+            # so we can adjust the model instruction for any call
+            model_instruction = kwargs["model_instruction"]
+        for idx, content in enumerate(splited_prompt):
+            self.message.append(
+                {
+                    "role": ["user", "assistant"][idx % 2],
+                    "content": [model_instruction + "\n\n" + content + "\n\n", content][
+                        idx % 2
+                    ],
+                }
+            )
         assert len(self.message) > 0, "message is empty"
         wsUrl = self._params.create_url()
         ws = websocket.WebSocketApp(

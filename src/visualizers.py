@@ -218,11 +218,11 @@ class ValueMapVisualizer:
             # resample to reduce the number of points
             if scene_points.shape[0] > self.max_scene_points:
                 resample_idx = np.random.choice(
-                    obj_points.shape[0],
-                    min(obj_points.shape[0], self.max_scene_points),
+                    scene_points.shape[0],
+                    min(scene_points.shape[0], self.max_scene_points),
                     replace=False,
                 )
-                obj_points = obj_points[resample_idx]
+                scene_points = scene_points[resample_idx]
                 if scene_point_colors is not None:
                     scene_point_colors = scene_point_colors[resample_idx]
             if scene_point_colors is None:
@@ -286,13 +286,13 @@ class ValueMapVisualizer:
         fig.update_layout(
             scene=dict(
                 xaxis=dict(
-                    showgrid=False, showticklabels=False, title="", visible=False
+                    showgrid=False, showticklabels=True, title="", visible=True
                 ),
                 yaxis=dict(
-                    showgrid=False, showticklabels=False, title="", visible=False
+                    showgrid=False, showticklabels=True, title="", visible=True
                 ),
                 zaxis=dict(
-                    showgrid=False, showticklabels=False, title="", visible=False
+                    showgrid=False, showticklabels=True, title="", visible=True
                 ),
             ),
         )

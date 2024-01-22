@@ -470,3 +470,685 @@ composer("open gripper")
                         # Query: rubbish.
                         rubbish = detect('rubbish')
                         ret_val = rubbish
+                                objects = ['bin', 'tomato', 'rubbish']
+                                # Query: chuck way any rubbish on the table rubbish.
+                                composer("grasp the rubbish")
+                                composer("move to the top of the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['bin', 'tomato', 'rubbish']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point at the center of the rubbish.
+                                        affordance_map = get_empty_affordance_map()
+                                        rubbish = parse_query_obj('rubbish')
+                                        center_x, center_y, center_z = rubbish.position
+                                        affordance_map[center_x, center_y, center_z] = 1
+                                        ret_val = affordance_map
+                                        # Query: open everywhere except 1cm around the rubbish.
+                                        gripper_map = get_empty_gripper_map()
+                                        # open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        # close when 1cm around the rubbish
+                                        rubbish = parse_query_obj('rubbish')
+                                        set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                                        ret_val = gripper_map
+                                objects = ['tomato', 'bin', 'rubbish']
+                                # Query: chuck way any rubbish on the table rubbish.
+                                composer("grasp the rubbish")
+                                composer("back to default pose")
+                                composer("move to 10cm on top of the bin")
+                                composer("open gripper")
+                                # done
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('the rubbish')
+                                    gripper_map = get_gripper_map('close the rubbish when within 5cm of it')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['tomato', 'bin', 'rubbish']
+                                        # Query: gripper.
+                                        ret_val = None
+                                        # Query: the rubbish.
+                                objects = ['tomato', 'rubbish', 'bin']
+                                # Query: drop the rubbish into the bin.
+                                composer("grasp the rubbish")
+                                composer("move to the top of the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['tomato', 'rubbish', 'bin']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point at the center of the rubbish.
+                                        affordance_map = get_empty_affordance_map()
+                                        rubbish = parse_query_obj('rubbish')
+                                        center_x, center_y, center_z = rubbish.position
+                                        affordance_map[center_x, center_y, center_z] = 1
+                                        ret_val = affordance_map
+                                        # Query: open everywhere except 1cm around the rubbish.
+                                        gripper_map = get_empty_gripper_map()
+                                        # open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        # close when 1cm around the rubbish
+                                        rubbish = parse_query_obj('rubbish')
+                                        set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                                        ret_val = gripper_map
+                                objects = ['bin', 'rubbish', 'tomato']
+                                # Query: put rubbish in bin.
+                                composer("grasp the rubbish")
+                                composer("move to 10cm above the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['bin', 'rubbish', 'tomato']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point at the center of the rubbish.
+                                        affordance_map = get_empty_affordance_map()
+                                        rubbish = parse_query_obj('rubbish')
+                                        center_x, center_y, center_z = rubbish.position
+                                        affordance_map[center_x, center_y, center_z] = 1
+                                        ret_val = affordance_map
+                                        # Query: open everywhere except 1cm around the rubbish.
+                                        gripper_map = get_empty_gripper_map()
+                                        # open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        # close when 1cm around the rubbish
+                                        rubbish = parse_query_obj('rubbish')
+                                        set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                                        ret_val = gripper_map
+                                        objects = ['bin', 'rubbish', 'tomato']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+                                        objects = ['bin', 'rubbish', 'tomato']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+                                objects = ['bin', 'tomato', 'rubbish']
+                                # Query: put rubbish in bin.
+                                composer("grasp the rubbish")
+                                composer("move to 10cm above the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['bin', 'tomato', 'rubbish']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point at the center of the rubbish.
+                                        affordance_map = get_empty_affordance_map()
+                                        rubbish = parse_query_obj('rubbish')
+                                        center_x, center_y, center_z = rubbish.position
+                                        affordance_map[center_x, center_y, center_z] = 1
+                                        ret_val = affordance_map
+                                        # Query: open everywhere except 1cm around the rubbish.
+                                        gripper_map = get_empty_gripper_map()
+                                        # open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        # close when 1cm around the rubbish
+                                        rubbish = parse_query_obj('rubbish')
+                                        set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                                        ret_val = gripper_map
+                                        objects = ['bin', 'tomato', 'rubbish']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+                                        objects = ['bin', 'tomato', 'rubbish']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+                                objects = ['rubbish', 'tomato', 'bin']
+                                # Query: chuck way any rubbish on the table rubbish.
+                                composer("grasp the rubbish")
+                                composer("move to the top of the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['rubbish', 'tomato', 'bin']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point at the center of the rubbish.
+                                        affordance_map = get_empty_affordance_map()
+                                        rubbish = parse_query_obj('rubbish')
+                                        center_x, center_y, center_z = rubbish.position
+                                        affordance_map[center_x, center_y, center_z] = 1
+                                        ret_val = affordance_map
+                                        # Query: open everywhere except 1cm around the rubbish.
+                                        gripper_map = get_empty_gripper_map()
+                                        # open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        # close when 1cm around the rubbish
+                                        rubbish = parse_query_obj('rubbish')
+                                        set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                                        ret_val = gripper_map
+                                        objects = ['rubbish', 'tomato', 'bin']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+
+
+
+
+
+                                        `detect`
+                                objects = ['tomato', 'rubbish', 'bin']
+                                # Query: chuck way any rubbish on the table rubbish.
+                                composer("grasp the rubbish")
+                                composer("move to the top of the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['tomato', 'rubbish', 'bin']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point at the center of the rubbish.
+                                        affordance_map = get_empty_affordance_map()
+                                        rubbish = parse_query_obj('rubbish')
+                                        center_x, center_y, center_z = rubbish.position
+                                        affordance_map[center_x, center_y, center_z] = 1
+                                        ret_val = affordance_map
+                                        # Query: open everywhere except 1cm around the rubbish.
+                                        gripper_map = get_empty_gripper_map()
+                                        # open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        # close when 1cm around the rubbish
+                                        rubbish = parse_query_obj('rubbish')
+                                        set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                                        ret_val = gripper_map
+                                        objects = ['tomato', 'rubbish', 'bin']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+
+
+
+
+                                        `detect`
+                                objects = ['bin', 'rubbish', 'tomato']
+                                # Query: put rubbish in bin.
+                                composer("grasp the rubbish")
+                                composer("move to 10cm above the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['bin', 'rubbish', 'tomato']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point at the center of the rubbish.
+                                        affordance_map = get_empty_affordance_map()
+                                        rubbish = parse_query_obj('rubbish')
+                                        center_x, center_y, center_z = rubbish.position
+                                        affordance_map[center_x, center_y, center_z] = 1
+                                        ret_val = affordance_map
+                                        # Query: open everywhere except 1cm around the rubbish.
+                                        gripper_map = get_empty_gripper_map()
+                                        # open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        # close when 1cm around the rubbish
+                                        rubbish = parse_query_obj('rubbish')
+                                        set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                                        ret_val = gripper_map
+                                        objects = ['bin', 'rubbish', 'tomato']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+                                        objects = ['bin', 'rubbish', 'tomato']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+                                    # Query: move to 10cm above the bin.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point 10cm above the bin')
+                                    execute(movable, affordance_map=affordance_map)
+                                        objects = ['bin', 'rubbish', 'tomato']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point 10cm above the bin.
+                                        affordance_map = get_empty_affordance_map()
+                                        bin_obj = parse_query_obj('bin')
+                                        (min_x, min_y, min_z), (max_x, max_y, max_z) = bin_obj.aabb
+                                        center_x, center_y, center_z = bin_obj.position
+                                        # 10cm above the bin
+                                        x = center_x
+                                        y = center_y
+                                        z = max_z + cm2index(10, 'z')
+                                        affordance_map[x, y, z] = 1
+                                        ret_val = affordance_map
+                                        objects = ['bin', 'rubbish', 'tomato']
+                                        # Query: bin.
+                                        bin = detect('bin')
+                                        ret_val = bin
+                                    # Query: open gripper.
+                                    execute(parse_query_obj('gripper'), gripper_map=get_gripper_map('open'))
+                                        objects = ['bin', 'rubbish', 'tomato']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: open.
+                                        gripper_map = get_empty_gripper_map()
+                                        # Open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        ret_val = gripper_map
+                                objects = ['rubbish', 'bin', 'tomato']
+                                # Query: put rubbish in bin.
+                                composer("grasp the rubbish")
+                                composer("move to 10cm above the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                objects = ['bin', 'rubbish', 'tomato']
+                                # Query: put rubbish in bin.
+                                composer("grasp the rubbish")
+                                composer("move to 10cm above the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['bin', 'rubbish', 'tomato']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point at the center of the rubbish.
+                                        affordance_map = get_empty_affordance_map()
+                                        rubbish = parse_query_obj('rubbish')
+                                        center_x, center_y, center_z = rubbish.position
+                                        affordance_map[center_x, center_y, center_z] = 1
+                                        ret_val = affordance_map
+                                        # Query: open everywhere except 1cm around the rubbish.
+                                        gripper_map = get_empty_gripper_map()
+                                        # open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        # close when 1cm around the rubbish
+                                        rubbish = parse_query_obj('rubbish')
+                                        set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                                        ret_val = gripper_map
+                                        objects = ['bin', 'rubbish', 'tomato']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+                                        objects = ['bin', 'rubbish', 'tomato']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+            objects = ['bin', 'tomato', 'rubbish']
+            # Query: drop the rubbish into the bin.
+            composer("grasp the rubbish")
+            composer("back to default pose")
+            composer("move to 10cm on top of the bin")
+            composer("open gripper")
+                # Query: grasp the rubbish.
+                movable = parse_query_obj('gripper')
+                affordance_map = get_affordance_map('a point at the center of the rubbish')
+                gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                    objects = ['bin', 'tomato', 'rubbish']
+                    # Query: gripper.
+                    gripper = detect('gripper')
+                    ret_val = gripper
+                    # Query: a point at the center of the rubbish.
+                    affordance_map = get_empty_affordance_map()
+                    rubbish = parse_query_obj('rubbish')
+                    center_x, center_y, center_z = rubbish.position
+                    affordance_map[center_x, center_y, center_z] = 1
+                    ret_val = affordance_map
+                    # Query: open everywhere except 1cm around the rubbish.
+                    gripper_map = get_empty_gripper_map()
+                    # open everywhere
+                    gripper_map[:, :, :] = 1
+                    # close when 1cm around the rubbish
+                    rubbish = parse_query_obj('rubbish')
+                    set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                    ret_val = gripper_map
+                        objects = ['bin', 'tomato', 'rubbish']
+                        # Query: rubbish.
+                        rubbish = detect('rubbish')
+                        ret_val = rubbish
+            objects = ['rubbish', 'tomato', 'bin']
+            # Query: pick up the rubbish and leave it in the trash can.
+            composer("grasp the rubbish")
+            composer("back to default pose")
+            composer("move to 10cm on top of the bin")
+            composer("open gripper")
+                # Query: grasp the rubbish.
+                movable = parse_query_obj('gripper')
+                affordance_map = get_affordance_map('a point at the center of the rubbish')
+                gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                    objects = ['rubbish', 'tomato', 'bin']
+                    # Query: gripper.
+                    gripper = detect('gripper')
+                    ret_val = gripper
+                    # Query: a point at the center of the rubbish.
+                    affordance_map = get_empty_affordance_map()
+                    rubbish = parse_query_obj('rubbish')
+                    center_x, center_y, center_z = rubbish.position
+                    affordance_map[center_x, center_y, center_z] = 1
+                    ret_val = affordance_map
+                    # Query: open everywhere except 1cm around the rubbish.
+                    gripper_map = get_empty_gripper_map()
+                    # open everywhere
+                    gripper_map[:, :, :] = 1
+                    # close when 1cm around the rubbish
+                    rubbish = parse_query_obj('rubbish')
+                    set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                    ret_val = gripper_map
+                        objects = ['rubbish', 'tomato', 'bin']
+                        # Query: rubbish.
+                        rubbish = detect('rubbish')
+                        ret_val = rubbish
+
+
+
+
+
+                        `detect`
+                                objects = ['tomato', 'bin', 'rubbish']
+                                # Query: put rubbish in bin.
+                                composer("grasp the rubbish")
+                                composer("move to the top of the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['tomato', 'bin', 'rubbish']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point at the center of the rubbish.
+                                        affordance_map = get_empty_affordance_map()
+                                        rubbish = parse_query_obj('rubbish')
+                                        center_x, center_y, center_z = rubbish.position
+                                        affordance_map[center_x, center_y, center_z] = 1
+                                        ret_val = affordance_map
+                                        # Query: open everywhere except 1cm around the rubbish.
+                                        gripper_map = get_empty_gripper_map()
+                                        # open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        # close when 1cm around the rubbish
+                                        rubbish = parse_query_obj('rubbish')
+                                        set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                                        ret_val = gripper_map
+                                        objects = ['tomato', 'bin', 'rubbish']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+                                objects = ['rubbish', 'tomato', 'bin']
+                                # Query: put rubbish in bin.
+                                composer("grasp the rubbish")
+                                composer("move to the top of the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['rubbish', 'tomato', 'bin']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point at the center of the rubbish.
+                                        affordance_map = get_empty_affordance_map()
+                                        rubbish = parse_query_obj('rubbish')
+                                        center_x, center_y, center_z = rubbish.position
+                                        affordance_map[center_x, center_y, center_z] = 1
+                                        ret_val = affordance_map
+                                        # Query: open everywhere except 1cm around the rubbish.
+                                        gripper_map = get_empty_gripper_map()
+                                        # open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        # close when 1cm around the rubbish
+                                        rubbish = parse_query_obj('rubbish')
+                                        set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                                        ret_val = gripper_map
+                                        objects = ['rubbish', 'tomato', 'bin']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+
+
+
+
+
+                                        `detect`
+                                objects = ['rubbish', 'tomato', 'bin']
+                                # Query: put rubbish in bin.
+                                composer("grasp the rubbish")
+                                composer("move to the top of the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['rubbish', 'tomato', 'bin']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point at the center of the rubbish.
+                                        affordance_map = get_empty_affordance_map()
+                                        rubbish = parse_query_obj('rubbish')
+                                        center_x, center_y, center_z = rubbish.position
+                                        affordance_map[center_x, center_y, center_z] = 1
+                                        ret_val = affordance_map
+                                        # Query: open everywhere except 1cm around the rubbish.
+                                        gripper_map = get_empty_gripper_map()
+                                        # open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        # close when 1cm around the rubbish
+                                        rubbish = parse_query_obj('rubbish')
+                                        set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                                        ret_val = gripper_map
+                                        objects = ['rubbish', 'tomato', 'bin']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+
+
+
+
+
+                                        `detect`
+                                objects = ['tomato', 'rubbish', 'bin']
+                                # Query: put rubbish in bin.
+                                composer("grasp the rubbish")
+                                composer("move to 10cm on top of the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['tomato', 'rubbish', 'bin']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point at the center of the rubbish.
+                                        affordance_map = get_empty_affordance_map()
+                                        rubbish = parse_query_obj('rubbish')
+                                        center_x, center_y, center_z = rubbish.position
+                                        affordance_map[center_x, center_y, center_z] = 1
+                                        ret_val = affordance_map
+                                        # Query: open everywhere except 1cm around the rubbish.
+                                        gripper_map = get_empty_gripper_map()
+                                        # open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        # close when 1cm around the rubbish
+                                        rubbish = parse_query_obj('rubbish')
+                                        set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                                        ret_val = gripper_map
+                                        objects = ['tomato', 'rubbish', 'bin']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+                                objects = ['rubbish', 'tomato', 'bin']
+                                # Query: put rubbish in bin.
+                                composer("grasp the rubbish")
+                                composer("back to default pose")
+                                composer("move to 10cm on top of the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['rubbish', 'tomato', 'bin']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point at the center of the rubbish.
+                                        affordance_map = get_empty_affordance_map()
+                                        rubbish = parse_query_obj('rubbish')
+                                        center_x, center_y, center_z = rubbish.position
+                                        affordance_map[center_x, center_y, center_z] = 1
+                                        ret_val = affordance_map
+                                        # Query: open everywhere except 1cm around the rubbish.
+                                        gripper_map = get_empty_gripper_map()
+                                        # open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        # close when 1cm around the rubbish
+                                        rubbish = parse_query_obj('rubbish')
+                                        set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                                        ret_val = gripper_map
+                                        objects = ['rubbish', 'tomato', 'bin']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        bin = detect('bin')
+                                        if np.linalg.norm(rubbish.position - bin.position) > 0.1:  # Adjust the threshold as needed
+                                            move_to(rubbish)
+                                            grasp(rubbish)
+                                            move_to(bin)
+                                            release()
+                                        ret_val = rubbish
+
+
+
+
+
+                                         `detect`, `move_to`, `grasp`, `release`  `position`
+                                objects = ['bin', 'rubbish', 'tomato']
+                                # Query: put rubbish in bin.
+                                composer("grasp the rubbish")
+                                composer("move to 10cm above the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['bin', 'rubbish', 'tomato']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+
+
+
+
+
+                                         `detect`  `detect`
+                                objects = ['bin', 'tomato', 'rubbish']
+                                # Query: put rubbish in bin.
+                                composer("grasp the rubbish")
+                                composer("move to 10cm above the bin")
+                                composer("open gripper")
+                                    # Query: grasp the rubbish.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point at the center of the rubbish')
+                                    gripper_map = get_gripper_map('open everywhere except 1cm around the rubbish')
+                                    execute(movable, affordance_map=affordance_map, gripper_map=gripper_map)
+                                        objects = ['bin', 'tomato', 'rubbish']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point at the center of the rubbish.
+                                        affordance_map = get_empty_affordance_map()
+                                        rubbish = parse_query_obj('rubbish')
+                                        center_x, center_y, center_z = rubbish.position
+                                        affordance_map[center_x, center_y, center_z] = 1
+                                        ret_val = affordance_map
+                                        # Query: open everywhere except 1cm around the rubbish.
+                                        gripper_map = get_empty_gripper_map()
+                                        # open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        # close when 1cm around the rubbish
+                                        rubbish = parse_query_obj('rubbish')
+                                        set_voxel_by_radius(gripper_map, rubbish.position, radius_cm=1, value=0)
+                                        ret_val = gripper_map
+                                        objects = ['bin', 'tomato', 'rubbish']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+                                        objects = ['bin', 'tomato', 'rubbish']
+                                        # Query: rubbish.
+                                        rubbish = detect('rubbish')
+                                        ret_val = rubbish
+                                    # Query: move to 10cm above the bin.
+                                    movable = parse_query_obj('gripper')
+                                    affordance_map = get_affordance_map('a point 10cm above the bin')
+                                    execute(movable, affordance_map=affordance_map)
+                                        objects = ['bin', 'tomato', 'rubbish']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: a point 10cm above the bin.
+                                        affordance_map = get_empty_affordance_map()
+                                        bin_obj = parse_query_obj('bin')
+                                        (min_x, min_y, min_z), (max_x, max_y, max_z) = bin_obj.aabb
+                                        center_x, center_y, center_z = bin_obj.position
+                                        # 10cm above the bin
+                                        x = center_x
+                                        y = center_y
+                                        z = max_z + cm2index(10, 'z')
+                                        affordance_map[x, y, z] = 1
+                                        ret_val = affordance_map
+                                        objects = ['bin', 'tomato', 'rubbish']
+                                        # Query: bin.
+                                        bin = detect('bin')
+                                        ret_val = bin
+                                    # Query: open gripper.
+                                    execute(parse_query_obj('gripper'), gripper_map=get_gripper_map('open'))
+                                        objects = ['bin', 'tomato', 'rubbish']
+                                        # Query: gripper.
+                                        gripper = detect('gripper')
+                                        ret_val = gripper
+                                        # Query: open.
+                                        gripper_map = get_empty_gripper_map()
+                                        # Open everywhere
+                                        gripper_map[:, :, :] = 1
+                                        ret_val = gripper_map

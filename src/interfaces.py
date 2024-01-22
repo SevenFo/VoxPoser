@@ -76,7 +76,7 @@ class LMP_interface:
             obs_dict["aabb"] = np.array([self.get_ee_pos(), self.get_ee_pos()])
             obs_dict["_position_world"] = self._env.get_ee_pos()
             if enable_vlm:
-                return [Observation(obs_dict)]
+                return [Observation(obs_dict)][0]
             else:
                 return Observation(obs_dict)
         elif obj_name.lower() in TABLE_ALIAS:
@@ -109,7 +109,7 @@ class LMP_interface:
                 ]
             )
             if enable_vlm:
-                return [Observation(obs_dict)]
+                return [Observation(obs_dict)][0]
             else:
                 return Observation(obs_dict)
         else:
@@ -141,35 +141,37 @@ class LMP_interface:
                 obs_dict["normal"] = normalize_vector(obj_normal.mean(axis=0))
                 return Observation(obs_dict)
             else:
+                if obs_results is None:
+                    return object_obs_list
                 for id, obs_result in enumerate(obs_results):
                     obs_dict = dict()
                     obj_pc, obj_normal = obs_result
-                    if self._env.visualizer is not None:
-                        self._env.visualizer.add_object_points(
-                            obj_pc, f"{obj_name}_{id}"
-                        )
-                        voxel_map = self._points_to_voxel_map(obj_pc)  # 体素图
-                        aabb_min = self._world_to_voxel(
-                            np.min(obj_pc, axis=0)
-                        )  # 体素图中每个坐标轴的最小坐标 (x_min, y_min, z_min)
-                        aabb_max = self._world_to_voxel(
-                            np.max(obj_pc, axis=0)
-                        )  # 体素图中每个坐标轴的最大坐标 (x_max, y_max, z_max)
-                        obs_dict["occupancy_map"] = voxel_map  # in voxel frame
-                        obs_dict["name"] = obj_name
-                        obs_dict["position"] = self._world_to_voxel(
-                            np.mean(obj_pc, axis=0)
-                        )  # in voxel frame 用点云的均值代表物体的位置
-                        obs_dict["aabb"] = np.array(
-                            [aabb_min, aabb_max]
-                        )  # in voxel frame
-                        obs_dict["_position_world"] = np.mean(
-                            obj_pc, axis=0
-                        )  # in world frame
-                        obs_dict["_point_cloud_world"] = obj_pc  # in world frame
-                        obs_dict["normal"] = normalize_vector(obj_normal.mean(axis=0))
+                    # if self._env.visualizer is not None:
+                    #     self._env.visualizer.add_object_points(
+                    #         obj_pc, f"{obj_name}_{id}"
+                    #     )
+                    voxel_map = self._points_to_voxel_map(obj_pc)  # 体素图
+                    aabb_min = self._world_to_voxel(
+                        np.min(obj_pc, axis=0)
+                    )  # 体素图中每个坐标轴的最小坐标 (x_min, y_min, z_min)
+                    aabb_max = self._world_to_voxel(
+                        np.max(obj_pc, axis=0)
+                    )  # 体素图中每个坐标轴的最大坐标 (x_max, y_max, z_max)
+                    obs_dict["occupancy_map"] = voxel_map  # in voxel frame
+                    obs_dict["name"] = obj_name
+                    obs_dict["position"] = self._world_to_voxel(
+                        np.mean(obj_pc, axis=0)
+                    )  # in voxel frame 用点云的均值代表物体的位置
+                    obs_dict["aabb"] = np.array(
+                        [aabb_min, aabb_max]
+                    )  # in voxel frame
+                    obs_dict["_position_world"] = np.mean(
+                        obj_pc, axis=0
+                    )  # in world frame
+                    obs_dict["_point_cloud_world"] = obj_pc  # in world frame
+                    obs_dict["normal"] = normalize_vector(obj_normal.mean(axis=0))
                     object_obs_list.append(Observation(obs_dict))
-        return object_obs_list
+        return object_obs_list[0] # for test
 
     def execute(
         self,
