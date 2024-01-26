@@ -1,3 +1,4 @@
+from typing import Union
 from LMP import LMP
 from utils import (
     get_clock_time,
@@ -15,9 +16,20 @@ import transforms3d
 from controllers import Controller
 
 from envs.rlbench_env import VoxPoserRLBench
+from envs.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
 
 # creating some aliases for end effector and table in case LLMs refer to them differently (but rarely this happens)
-EE_ALIAS = ["ee", "endeffector", "end_effector", "end effector", "gripper", "hand"]
+EE_ALIAS = [
+    "ee",
+    "endeffector",
+    "end_effector",
+    "end effector",
+    "gripper",
+    "hand",
+    "copter",
+    "quadricopter",
+    "UAV",
+]
 TABLE_ALIAS = [
     "table",
     "desk",
@@ -33,7 +45,7 @@ TABLE_ALIAS = [
 class LMP_interface:
     def __init__(
         self,
-        env: VoxPoserRLBench,
+        env: Union[VoxPoserRLBench, VoxPoserPyRepQuadcopterEnv],
         lmp_config,
         controller_config,
         planner_config,
@@ -45,7 +57,7 @@ class LMP_interface:
         self._map_size = self._cfg["map_size"]
         self._planner = PathPlanner(planner_config, map_size=self._map_size)
         self._controller = Controller(self._env, controller_config)
-
+        self.is_quad_env = type(self._env) == VoxPoserPyRepQuadcopterEnv
         # calculate size of each voxel (resolution)
         self._resolution = (
             self._env.workspace_bounds_max - self._env.workspace_bounds_min
@@ -63,6 +75,40 @@ class LMP_interface:
         return self._world_to_voxel(self._env.get_ee_pos())
 
     def detect(self, obj_name):
+        if self.is_quad_env:
+            return self.detect_quad(obj_name)
+        else:
+            return self.detect_arm(obj_name)
+
+    def execute(
+        self,
+        movable_obs_func,
+        affordance_map=None,
+        avoidance_map=None,
+        velocity_map=None,
+        rotation_map=None,
+        gripper_map=None,
+    ):
+        if self.is_quad_env:
+            return self.execute_quad(
+                movable_obs_func,
+                affordance_map,
+                avoidance_map,
+                velocity_map,
+                rotation_map,
+                gripper_map,
+            )
+        else:
+            return self.execute_arm(
+                movable_obs_func,
+                affordance_map,
+                avoidance_map,
+                None,
+                velocity_map,
+                None,
+            )
+
+    def detect_arm(self, obj_name):
         """return an observation dict containing useful information about the object"""
         enable_vlm = False if self._env.vlm == None else True
         object_obs_list = []
@@ -162,18 +208,215 @@ class LMP_interface:
                     obs_dict["position"] = self._world_to_voxel(
                         np.mean(obj_pc, axis=0)
                     )  # in voxel frame 用点云的均值代表物体的位置
-                    obs_dict["aabb"] = np.array(
-                        [aabb_min, aabb_max]
-                    )  # in voxel frame
+                    obs_dict["aabb"] = np.array([aabb_min, aabb_max])  # in voxel frame
                     obs_dict["_position_world"] = np.mean(
                         obj_pc, axis=0
                     )  # in world frame
                     obs_dict["_point_cloud_world"] = obj_pc  # in world frame
                     obs_dict["normal"] = normalize_vector(obj_normal.mean(axis=0))
                     object_obs_list.append(Observation(obs_dict))
-        return object_obs_list[0] # for test
+        return object_obs_list[0]  # for test
 
-    def execute(
+    def detect_quad(self, obj_name):
+        """return an observation dict containing useful information about the object"""
+        assert self._env.vlm is not None, "please enable VLM before calling detect_quad"
+        object_obs_list = []
+        # enable_vlm = False
+        print(f"calling detect VLM enable: {True}")
+        if obj_name.lower() in EE_ALIAS:
+            # 如果是执行器则不需要调用模型进行检测
+            obs_dict = dict()
+            obs_dict["name"] = obj_name
+            obs_dict["position"] = self.get_ee_pos()
+            obs_dict["aabb"] = np.array([self.get_ee_pos(), self.get_ee_pos()])
+            obs_dict["_position_world"] = self._env.get_ee_pos()
+            return [Observation(obs_dict)][0]
+        else:
+            obs_results = self._env.get_3d_obs_by_name_by_vlm(obj_name)
+            if obs_results is None:
+                return object_obs_list
+            for id, obs_result in enumerate(obs_results):
+                obs_dict = dict()
+                obj_pc, obj_normal = obs_result
+                # if self._env.visualizer is not None:
+                #     self._env.visualizer.add_object_points(
+                #         obj_pc, f"{obj_name}_{id}"
+                #     )
+                voxel_map = self._points_to_voxel_map(obj_pc)  # 体素图
+                aabb_min = self._world_to_voxel(
+                    np.min(obj_pc, axis=0)
+                )  # 体素图中每个坐标轴的最小坐标 (x_min, y_min, z_min)
+                aabb_max = self._world_to_voxel(
+                    np.max(obj_pc, axis=0)
+                )  # 体素图中每个坐标轴的最大坐标 (x_max, y_max, z_max)
+                obs_dict["occupancy_map"] = voxel_map  # in voxel frame
+                obs_dict["name"] = obj_name
+                obs_dict["position"] = self._world_to_voxel(
+                    np.mean(obj_pc, axis=0)
+                )  # in voxel frame 用点云的均值代表物体的位置
+                obs_dict["aabb"] = np.array([aabb_min, aabb_max])  # in voxel frame
+                obs_dict["_position_world"] = np.mean(obj_pc, axis=0)  # in world frame
+                obs_dict["_point_cloud_world"] = obj_pc  # in world frame
+                obs_dict["normal"] = normalize_vector(obj_normal.mean(axis=0))
+                object_obs_list.append(Observation(obs_dict))
+        return object_obs_list[0]  # for test
+
+    def execute_quad(
+        self,
+        movable_obs_func,
+        affordance_map=None,
+        avoidance_map=None,
+        velocity_map=None,
+        rotation_map=None,
+        gripper_map=None,
+    ):
+        """
+        First use planner to generate waypoint path, then use controller to follow the waypoints.
+
+        Args:
+          movable_obs_func: callable function to get observation of the body to be moved
+          affordance_map: callable function that generates a 3D numpy array, the target voxel map
+          avoidance_map: callable function that generates a 3D numpy array, the obstacle voxel map
+          rotation_map: callable function that generates a 4D numpy array, the rotation voxel map (rotation is represented by a quaternion *in world frame*), not used for quadricopter
+          velocity_map: callable function that generates a 3D numpy array, the velocity voxel map
+          gripper_map: callable function that generates a 3D numpy array, the gripper voxel map, not used for quadricopter
+        """
+        print("calling execute")
+        assert gripper_map is None, "gripper_map is not used for quadricopter"
+        assert (
+            rotation_map is None
+        ), "rotation_map is not used for quadricopter as we havent implemented it"
+        # initialize default voxel maps if not specified
+        if velocity_map is None:
+            velocity_map = self._get_default_voxel_map("velocity")
+        if avoidance_map is None:
+            avoidance_map = self._get_default_voxel_map("obstacle")
+        object_centric = not movable_obs_func()["name"] in EE_ALIAS
+        assert not object_centric, "the movable object must be the quadricopter"
+        execute_info = []
+        if affordance_map is not None:
+            # execute path in closed-loop
+            print(f"max plan iter: {self._cfg['max_plan_iter']}")
+            for plan_iter in range(self._cfg["max_plan_iter"]):
+                step_info = dict()
+                # evaluate voxel maps such that we use latest information
+                movable_obs = movable_obs_func()
+                _affordance_map = affordance_map()
+                _avoidance_map = avoidance_map()
+                _velocity_map = velocity_map()
+                # TODO preprocess avoidance map, havent implemented yet
+                _avoidance_map = self._preprocess_avoidance_map(
+                    _avoidance_map, _affordance_map, movable_obs
+                )
+                # start planning
+                start_pos = movable_obs["position"]
+                start_time = time.time()
+                # optimize path and log
+                path_voxel, planner_info = self._planner.optimize(
+                    start_pos,
+                    _affordance_map,
+                    _avoidance_map,
+                    object_centric=object_centric,
+                )
+                print(
+                    f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] planner time: {time.time() - start_time:.3f}s{bcolors.ENDC}"
+                )
+                assert len(path_voxel) > 0, "path_voxel is empty"
+                step_info["path_voxel"] = path_voxel
+                step_info["planner_info"] = planner_info
+                # convert voxel path to world trajectory, and include rotation, velocity, and gripper information
+                traj_world = self._path2traj(
+                    path_voxel,
+                    rotation_map=None,
+                    velocity_map=_velocity_map,
+                    gripper_map=None,
+                )  # we will get a list of tuple: (world_xyz, rotation, velocity, gripper)
+                traj_world = traj_world[: self._cfg["num_waypoints_per_plan"]]
+                step_info["start_pos"] = start_pos
+                step_info["plan_iter"] = plan_iter
+                step_info["movable_obs"] = movable_obs
+                step_info["traj_world"] = traj_world
+                step_info["affordance_map"] = _affordance_map
+                step_info["rotation_map"] = (
+                    rotation_map() if rotation_map is not None else None
+                )
+                step_info["velocity_map"] = _velocity_map
+                step_info["gripper_map"] = (
+                    gripper_map() if gripper_map is not None else None
+                )
+                step_info["avoidance_map"] = _avoidance_map
+
+                # visualize
+                if self._cfg["visualize"]:
+                    assert self._env.visualizer is not None
+                    step_info["start_pos_world"] = self._voxel_to_world(start_pos)
+                    step_info["targets_world"] = self._voxel_to_world(
+                        planner_info["targets_voxel"]
+                    )
+                    self._env.visualizer.visualize(step_info)
+
+                # execute path
+                print(
+                    f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] start executing path via controller ({len(traj_world)} waypoints){bcolors.ENDC}"
+                )
+                controller_infos = dict()
+                for i, waypoint in enumerate(traj_world):
+                    # check if the movement is finished
+                    if (
+                        np.linalg.norm(
+                            movable_obs["_position_world"] - traj_world[-1][0]
+                        )
+                        <= 0.01
+                    ):
+                        print(
+                            f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] reached last waypoint; curr_xyz={movable_obs['_position_world']}, target={traj_world[-1][0]} (distance: {np.linalg.norm(movable_obs['_position_world'] - traj_world[-1][0]):.3f})){bcolors.ENDC}"
+                        )
+                        break
+                    # skip waypoint if moving to this point is going in opposite direction of the final target point
+                    # (for example, if you have over-pushed an object, no need to move back)
+                    if i != 0 and i != len(traj_world) - 1:
+                        movable2target = (
+                            traj_world[-1][0] - movable_obs["_position_world"]
+                        )
+                        movable2waypoint = waypoint[0] - movable_obs["_position_world"]
+                        if np.dot(movable2target, movable2waypoint).round(3) <= 0:
+                            print(
+                                f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] skip waypoint {i+1} because it is moving in opposite direction of the final target{bcolors.ENDC}"
+                            )
+                            continue
+                    # execute waypoint
+                    controller_info = self._controller.execute(movable_obs, waypoint)
+                    # loggging
+                    movable_obs = movable_obs_func()
+                    dist2target = np.linalg.norm(
+                        movable_obs["_position_world"] - traj_world[-1][0]
+                    )
+                    if not object_centric and controller_info["mp_info"] == -1:
+                        print(
+                            f'{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] failed waypoint {i+1} (wp: {waypoint[0].round(3)}, actual: {movable_obs["_position_world"].round(3)}, target: {traj_world[-1][0].round(3)}, start: {traj_world[0][0].round(3)}, dist2target: {dist2target.round(3)}); mp info: {controller_info["mp_info"]}{bcolors.ENDC}'
+                        )
+                    else:
+                        print(
+                            f'{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] completed waypoint {i+1} (wp: {waypoint[0].round(3)}, actual: {movable_obs["_position_world"].round(3)}, target: {traj_world[-1][0].round(3)}, start: {traj_world[0][0].round(3)}, dist2target: {dist2target.round(3)}){bcolors.ENDC}'
+                        )
+                    controller_info["controller_step"] = i
+                    controller_info["target_waypoint"] = waypoint
+                    controller_infos[i] = controller_info
+                step_info["controller_infos"] = controller_infos
+                execute_info.append(step_info)
+                # check whether we need to replan
+                curr_pos = movable_obs["position"]
+                if distance_transform_edt(1 - _affordance_map)[tuple(curr_pos)] <= 2:
+                    print(
+                        f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] reached target; terminating {bcolors.ENDC}"
+                    )
+                    break
+        print(
+            f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] finished executing path via controller{bcolors.ENDC}"
+        )
+        return execute_info
+
+    def execute_arm(
         self,
         movable_obs_func,
         affordance_map=None,
@@ -525,14 +768,24 @@ class LMP_interface:
             world_xyz = self._voxel_to_world(voxel_xyz)
             voxel_xyz = np.round(voxel_xyz).astype(int)
             # get the current rotation (in world frame)
-            rotation = rotation_map[voxel_xyz[0], voxel_xyz[1], voxel_xyz[2]]
+            rotation = (
+                rotation_map[voxel_xyz[0], voxel_xyz[1], voxel_xyz[2]]
+                if rotation_map is not None
+                else None
+            )
             # get the current velocity
             velocity = velocity_map[voxel_xyz[0], voxel_xyz[1], voxel_xyz[2]]
             # get the current on/off
-            gripper = gripper_map[voxel_xyz[0], voxel_xyz[1], voxel_xyz[2]]
+            gripper = (
+                gripper_map[voxel_xyz[0], voxel_xyz[1], voxel_xyz[2]]
+                if gripper_map is not None
+                else None
+            )
             # LLM might specify a gripper value change, but sometimes EE may not be able to reach the exact voxel, so we overwrite the gripper value if it's close enough (TODO: better way to do this?)
-            if (i == len(path) - 1) and not (
-                np.all(gripper_map == 1) or np.all(gripper_map == 0)
+            if (
+                gripper is not None
+                and (i == len(path) - 1)
+                and not (np.all(gripper_map == 1) or np.all(gripper_map == 0))
             ):
                 # get indices of the less common values
                 less_common_value = (
@@ -558,32 +811,32 @@ class LMP_interface:
         return traj
 
     def _preprocess_avoidance_map(self, avoidance_map, affordance_map, movable_obs):
-        # collision avoidance
-        scene_collision_map = self._get_scene_collision_voxel_map()
-        # anywhere within 15/100 indices of the target is ignored (to guarantee that we can reach the target)
-        ignore_mask = distance_transform_edt(1 - affordance_map)
-        scene_collision_map[ignore_mask < int(0.15 * self._map_size)] = 0
-        # anywhere within 15/100 indices of the start is ignored
-        try:
-            ignore_mask = distance_transform_edt(1 - movable_obs["occupancy_map"])
-            scene_collision_map[ignore_mask < int(0.15 * self._map_size)] = 0
-        except KeyError:
-            start_pos = movable_obs["position"]
-            ignore_mask = np.ones_like(avoidance_map)
-            ignore_mask[
-                start_pos[0]
-                - int(0.1 * self._map_size) : start_pos[0]
-                + int(0.1 * self._map_size),
-                start_pos[1]
-                - int(0.1 * self._map_size) : start_pos[1]
-                + int(0.1 * self._map_size),
-                start_pos[2]
-                - int(0.1 * self._map_size) : start_pos[2]
-                + int(0.1 * self._map_size),
-            ] = 0
-            scene_collision_map *= ignore_mask
-        avoidance_map += scene_collision_map
-        avoidance_map = np.clip(avoidance_map, 0, 1)
+        # # collision avoidance
+        # scene_collision_map = self._get_scene_collision_voxel_map()
+        # # anywhere within 15/100 indices of the target is ignored (to guarantee that we can reach the target)
+        # ignore_mask = distance_transform_edt(1 - affordance_map)
+        # scene_collision_map[ignore_mask < int(0.15 * self._map_size)] = 0
+        # # anywhere within 15/100 indices of the start is ignored
+        # try:
+        #     ignore_mask = distance_transform_edt(1 - movable_obs["occupancy_map"])
+        #     scene_collision_map[ignore_mask < int(0.15 * self._map_size)] = 0
+        # except KeyError:
+        #     start_pos = movable_obs["position"]
+        #     ignore_mask = np.ones_like(avoidance_map)
+        #     ignore_mask[
+        #         start_pos[0]
+        #         - int(0.1 * self._map_size) : start_pos[0]
+        #         + int(0.1 * self._map_size),
+        #         start_pos[1]
+        #         - int(0.1 * self._map_size) : start_pos[1]
+        #         + int(0.1 * self._map_size),
+        #         start_pos[2]
+        #         - int(0.1 * self._map_size) : start_pos[2]
+        #         + int(0.1 * self._map_size),
+        #     ] = 0
+        #     scene_collision_map *= ignore_mask
+        # avoidance_map += scene_collision_map
+        # avoidance_map = np.clip(avoidance_map, 0, 1)
         return avoidance_map
 
 

@@ -270,7 +270,7 @@ class Spark:
     def __call__(self, **kwargs):
         self.answer = ""
         assert "prompt" in kwargs.keys(), "engine call kwargs not contain messages"
-        prompt, splited_prompt = kwargs["prompt"]        # add other params
+        prompt, splited_prompt = kwargs["prompt"]  # add other params
         if "max_token" in kwargs.keys():
             self._max_tokens = kwargs["max_tokens"]
         # for m in kwargs["prompt"]:
@@ -312,6 +312,55 @@ class Spark:
             return code_segments[0]
         else:
             return self.answer
+
+
+class Dummy:
+    """Dunmmy engine for test, it will return the test code directly"""
+
+    def __init__(self, **kwargs) -> None:
+        self.answers = {
+            "# Query: go to the table.": """
+composer('move to 10cm above the table')
+""",
+            "# Query: move to 10cm above the table.": """
+movable = parse_query_obj('quadricopter')
+affordance_map = get_affordance_map('a point 10cm above the table')
+execute(movable, affordance_map=affordance_map)
+""",
+            "# Query: a point 10cm above the table.": """
+affordance_map = get_empty_affordance_map()
+table_obj = parse_query_obj('table')
+(min_x, min_y, min_z), (max_x, max_y, max_z) = table_obj.aabb
+center_x, center_y, center_z = table_obj.position
+x = center_x
+y = center_y
+z = max_z + cm2index(10, 'z')
+affordance_map[x, y, z] = 1
+ret_val = affordance_map
+""",
+            "# Query: table.": """
+table = detect('table')
+ret_val = table[0]
+""",
+            "# Query: quadricopter.": """
+quadricopter = detect('quadricopter')
+ret_val = quadricopter[0]
+""",
+        }
+
+    def __call__(self, **kwargs):
+        assert "prompt" in kwargs.keys(), "engine call kwargs not contain messages"
+        prompt, splited_prompt = kwargs["prompt"]  # add other params
+        last_prompt = splited_prompt[-1]
+        # get the last line of last_prompt except the blank line
+        for line in last_prompt.split("\n")[::-1]:
+            if line != "\n" and line != "":
+                last_prompt = line
+                break
+        assert (
+            last_prompt in self.answers.keys()
+        ), f"prompt [{last_prompt}] not in answers {self.answers.keys()}"
+        return self.answers[last_prompt]
 
 
 class GPT4:

@@ -79,6 +79,8 @@ class ValueMapVisualizer:
 
     def update_scene_points(self, points, colors=None):
         points = points.astype(np.float16)
+        if colors is None:
+            colors = np.zeros((points.shape[0], 3), dtype=np.uint8) # default color is black
         assert colors.dtype == np.uint8
         self.scene_points = (points, colors)
 
@@ -285,15 +287,9 @@ class ValueMapVisualizer:
         # do not show grid and axes
         fig.update_layout(
             scene=dict(
-                xaxis=dict(
-                    showgrid=False, showticklabels=True, title="", visible=True
-                ),
-                yaxis=dict(
-                    showgrid=False, showticklabels=True, title="", visible=True
-                ),
-                zaxis=dict(
-                    showgrid=False, showticklabels=True, title="", visible=True
-                ),
+                xaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
+                yaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
+                zaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
             ),
         )
 
@@ -335,7 +331,6 @@ class ValueMapVisualizer:
                 row=1,
                 col=2,
             )
-
 
         # save and show
         if save and self.save_dir is not None:

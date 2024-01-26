@@ -256,8 +256,21 @@ class VoxPoserPyRepQuadcopterEnv:
         Returns:
             tuple: A tuple containing scene points and colors.
         """
-        raise NotImplementedError("This function is not implemented yet")
-        return points, colors
+        points, masks, normals = [], [], []
+        if cameras is None:
+            cameras = self.camera_names
+        for cam in self.camera_names:
+            depth_frame = getattr(self.latest_obs, f"{cam}_depth")
+            point = convert_depth_to_pointcloud(
+                depth_image=depth_frame,
+                extrinsic_params=self.camera_params[cam]["extrinsic_params"],
+                camera_intrinsics=self.camera_params[cam]["intrinsic_params"],
+                clip_far=self.camera_params[cam]["far_near"][0],
+                clip_near=self.camera_params[cam]["far_near"][1],
+            )
+            points.append(point.reshape(-1, 3))
+        points = np.concatenate(points, axis=0)
+        return points, None
 
     def get_obs(self):
         """get observation from the environment, including vision sensor data and the current position of quadcopter
@@ -364,7 +377,7 @@ class VoxPoserPyRepQuadcopterEnv:
     def apply_action(self, action):
         """
         Applies an action in the environment and updates the state
-        while the action is the target position of qudacopter in form of [x,y,z,quaternion,orientation], where quaternion is in form of [x,y,z,w], orientation is in form of [roll,pitch,yaw]
+        while the action is the target position of qudacopter in form of [x,y,z,quaternion], where quaternion is in form of [x,y,z,w], orientation is in form of [roll,pitch,yaw]
         however, we only apply the target position (x,y,z), the orientation has not been implemented yet, which means the orientation of quadcopter is fixed, or keep horizontal
         attention: the process would be blocked until the quadcopter reach the target position
 
@@ -374,6 +387,9 @@ class VoxPoserPyRepQuadcopterEnv:
         Returns:
             tuple: A tuple containing the latest observations, reward, and termination flag.
         """
+        assert (
+            len(action) == 7
+        ), "the action should be [x,y,z,quaternion] where quaternion is in form of [x,y,z,w]"
         action = self._process_action(action)
         # actually before apply action, we should check whether the action is valid, while we haven't implement it
         remainder = self.quadcopter.goto(action[:3])
