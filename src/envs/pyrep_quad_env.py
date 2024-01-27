@@ -1,4 +1,5 @@
 import os, re, warnings
+import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
 import json
@@ -93,8 +94,8 @@ class VoxPoserPyRepQuadcopterEnv:
         ]  # set camera properties
         self.vlm = vlmpipeline
 
-        self.workspace_bounds_min = np.array([0, 0, 0])
-        self.workspace_bounds_max = np.array([10, 10, 10])
+        self.workspace_bounds_min = np.array([-5, -5, 0])
+        self.workspace_bounds_max = np.array([5, 5, 3])
         self.visualizer = visualizer
         if self.visualizer is not None:
             self.visualizer.update_bounds(
@@ -124,11 +125,12 @@ class VoxPoserPyRepQuadcopterEnv:
                     }
                 }
             )
-        print(f"{bcolors.OKGREEN}Camera parameters:{bcolors.ENDC} {self.camera_params}")
+        # print(f"{bcolors.OKGREEN}Camera parameters:{bcolors.ENDC} {self.camera_params}")
 
         # get quadcopter object
         self.quadcopter = Quadcopter()
         self.init_task()
+        self.has_processed_first_frame = False
 
     def get_object_names(self):
         """
@@ -202,7 +204,7 @@ class VoxPoserPyRepQuadcopterEnv:
             flip_indices = np.dot(cam_normals, self.lookat_vectors[cam]) > 0
             cam_normals[flip_indices] *= -1
             normals.append(cam_normals)
-            break  # for test
+            # break  # for test
         points = np.concatenate(points, axis=0)
         masks = np.concatenate(masks, axis=0)  # [0,101,102,201,202,0,0,0,301]
         categery_masks = (
@@ -359,21 +361,19 @@ class VoxPoserPyRepQuadcopterEnv:
         self.latest_obs = obs
         self.latest_mask = {}
         rgb_frames = {}  # in c w h
+        self.target_objects_labels = list(range(len(self.target_objects)))
         for cam in self.camera_names:
             rgb_frames[cam] = getattr(self.latest_obs, f"{cam}_rgb").transpose(
                 [2, 0, 1]
             )
-            self.target_objects_labels = list(range(len(self.target_objects)))
-            self.latest_mask[cam] = (
-                self.vlm.process_first_frame(
-                    self.target_objects, rgb_frames[cam], verbose=True
-                )
-                if self.vlm is not None
-                else None
-            )
-            break
-
+        frames = np.stack(list(rgb_frames.values()), axis=0)
+        masks = self.vlm.process_first_frame(self.target_objects, frames, verbose=True)
+        if not np.any(masks):
+            raise ValueError("no intrested object found in the scene, may be you should let robot turn around or change the scene or change the target object")
+            return None
+        [self.latest_mask.update({cam:mask})for cam,mask in zip(self.camera_names,masks)]
         self._update_visualizer()
+        self.has_processed_first_frame = True
         return descriptions, obs
 
     def apply_action(self, action):
@@ -389,6 +389,7 @@ class VoxPoserPyRepQuadcopterEnv:
         Returns:
             tuple: A tuple containing the latest observations, reward, and termination flag.
         """
+        assert self.has_processed_first_frame, "Please reset the environment first or let VLM process the first frame"
         assert (
             len(action) == 7
         ), "the action should be [x,y,z,quaternion] where quaternion is in form of [x,y,z,w]"
@@ -432,18 +433,17 @@ class VoxPoserPyRepQuadcopterEnv:
         self.latest_action = action
         # use VLM to get the mask of the intrerested objects from rgb image from latest_obs
         rgb_frames = {}  # in c w h
+        self.target_objects_labels = list(range(len(self.target_objects)))
         for cam in self.camera_names:
             rgb_frames[cam] = getattr(self.latest_obs, f"{cam}_rgb").transpose(
                 [2, 0, 1]
             )
-            self.latest_mask[cam] = (
-                self.vlm.process_frame(
-                    rgb_frames[cam], verbose=True, release_video_memory=True
-                )
-                if self.vlm is not None
-                else None
-            )
-            break
+        frames = np.stack(list(rgb_frames.values()), axis=0)
+        masks = self.vlm.process_frame(frames, verbose=True)
+        if not np.any(masks):
+            raise ValueError("no intrested object found in the scene, may be you should let robot turn around or change the scene or change the target object")
+            return None
+        [self.latest_mask.update({cam:mask})for cam,mask in zip(self.camera_names,masks)]
         self._update_visualizer()
         return obs, reward, terminate
 
@@ -488,6 +488,7 @@ class VoxPoserPyRepQuadcopterEnv:
     def _update_visualizer(self):
         """
         Updates the scene in the visualizer with the latest observations.
+        Update after each step. (reset and applid action)
 
         Note: This function is generally called internally.
         """
@@ -496,6 +497,24 @@ class VoxPoserPyRepQuadcopterEnv:
                 ignore_robot=False, ignore_grasped_obj=False
             )
             self.visualizer.update_scene_points(points, colors)
+            fig = plt.figure(figsize=(6.4*len(self.camera_names), 4.8))
+            for idx, cam in enumerate(self.camera_names):
+                rgb = getattr(self.latest_obs, f"{cam}_rgb")
+                mask = np.mod(self.latest_mask[cam], 256) # avoid overflow for color
+                # create a subfigure for each rgb frame
+                ax = fig.add_subplot(1, len(self.camera_names), idx+1)
+                ax.imshow(rgb)
+                ax.imshow(mask, alpha=0.5,cmap='gray', vmin=0, vmax=255)
+                ax.set_title(cam)
+                # tight_layout会自动调整子图参数，使之填充整个图像区域
+                plt.tight_layout()
+            # trans fig to numpy array
+            fig.canvas.draw()
+            data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+            data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+            plt.close(fig)
+            self.visualizer.add_frame(data)
+            
 
     def _process_obs(self, obs):
         """

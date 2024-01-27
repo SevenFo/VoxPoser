@@ -238,15 +238,11 @@ class LMP_interface:
             return [Observation(obs_dict)]
         else:
             obs_results = self._env.get_3d_obs_by_name_by_vlm(obj_name)
-            if obs_results is None:
+            if obs_results is None: # actually if obs_results is None, it would raise an error in the get_3d_obs_by_name_by_vlm function
                 return object_obs_list
             for id, obs_result in enumerate(obs_results):
                 obs_dict = dict()
                 obj_pc, obj_normal = obs_result
-                # if self._env.visualizer is not None:
-                #     self._env.visualizer.add_object_points(
-                #         obj_pc, f"{obj_name}_{id}"
-                #     )
                 voxel_map = self._points_to_voxel_map(obj_pc)  # 体素图
                 aabb_min = self._world_to_voxel(
                     np.min(obj_pc, axis=0)
@@ -264,7 +260,7 @@ class LMP_interface:
                 obs_dict["_point_cloud_world"] = obj_pc  # in world frame
                 obs_dict["normal"] = normalize_vector(obj_normal.mean(axis=0))
                 object_obs_list.append(Observation(obs_dict))
-        return object_obs_list  # for test
+        return object_obs_list 
 
     def execute_quad(
         self,
@@ -419,6 +415,7 @@ class LMP_interface:
         print(
             f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] finished executing path via controller{bcolors.ENDC}"
         )
+        self._env.visualizer.save_gifs()
         return execute_info
 
     def execute_arm(

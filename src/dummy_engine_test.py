@@ -34,11 +34,9 @@ vlmpipeline = VLM(
     resnet_18_path,
     resnet_50_path,
     verbose=False,
-    resize_to=[640,640]
+    resize_to=[320,320],
+    input_batch_size=5
 )
-
-
-
 
 visualizer = ValueMapVisualizer(config['visualizer'])
 env = VoxPoserPyRepQuadcopterEnv(visualizer=visualizer,headless=True,coppelia_scene_path=scene_path,vlmpipeline=vlmpipeline)
@@ -49,3 +47,8 @@ voxposer_ui = lmps['plan_ui']
 set_lmp_objects(lmps, env.get_object_names())
 
 voxposer_ui(descriptions)
+
+env._pyrep.stop()
+env._pyrep.shutdown()
+
+disp.stop()

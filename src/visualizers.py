@@ -1,5 +1,6 @@
 """Plotly-Based Visualizer"""
 import plotly.graph_objects as go
+import imageio.v3 as iio
 from plotly.subplots import make_subplots
 import numpy as np
 import os
@@ -20,6 +21,8 @@ class ValueMapVisualizer:
         self.update_quality(self.quality)
         self.map_size = config["map_size"]
         self.objects_points = []
+        self.masks = []
+        self.frames = []
 
     def update_bounds(self, lower, upper):
         self.workspace_bounds_min = lower
@@ -78,6 +81,11 @@ class ValueMapVisualizer:
             )
 
     def update_scene_points(self, points, colors=None):
+        minx, miny, minz = self.workspace_bounds_min
+        maxx, maxy, maxz = self.workspace_bounds_max
+        mask = np.stack([points[:,0] < minx+0.1, points[:,0] > maxx-0.1, points[:,1] < miny+0.1, points[:,1]> maxy-0.1, points[:,2] < minz+0.1, points[:,2] > maxz-0.1], axis=1)
+        mask = np.logical_not(np.any(mask, axis=1))
+        points = points[mask,:]
         points = points.astype(np.float16)
         if colors is None:
             colors = np.zeros((points.shape[0], 3), dtype=np.uint8) # default color is black
@@ -91,8 +99,34 @@ class ValueMapVisualizer:
     def update_depth_map(self, depth_map):
         self.depth_map = depth_map
 
-    def update_mask(self, mask):
-        self.mask = mask
+    def add_mask(self, mask):
+        self.masks.append(mask)
+
+    def add_frame(self, frame):
+        self.frames.append(frame)
+
+    def save_gifs(self):
+        curr_time = datetime.datetime.now()
+        log_id = f"{curr_time.hour}:{curr_time.minute}:{curr_time.second}"
+        if len(self.frames) > 0:
+            save_path = os.path.join(self.save_dir, log_id + "-frames.gif")
+            print(f"** saving frames gif to {save_path}")
+            iio.imwrite(
+                save_path,
+                np.stack(self.frames, axis=0),
+                fps=10
+            )
+        if len(self.masks) > 0:
+            save_path = os.path.join(self.save_dir, log_id + "-masks.gif")
+            print(f"** saving masks gif to {save_path}")
+            iio.imwrite(
+                save_path,
+                np.stack(self.masks, axis=0),
+                fps=10
+            )
+        print("** saved to", self.save_dir)
+        self.masks = []
+        self.frames = []
 
     def visualize(self, info, show=False, save=True):
         """
@@ -241,7 +275,8 @@ class ValueMapVisualizer:
                     marker=dict(size=3, color=scene_point_colors, opacity=1.0),
                 )
             )
-        # fig = go.Figure(data=fig_data)
+
+
         fig = make_subplots(
             rows=2,
             cols=2,
@@ -263,8 +298,7 @@ class ValueMapVisualizer:
             fig.add_trace(trace, row=1, col=1)
 
         # set bounds and ratio
-        fig.update_layout(
-            scene=dict(
+        fig.update_scenes(
                 xaxis=dict(
                     range=[self.plot_bounds_min[0], self.plot_bounds_max[0]],
                     autorange=False,
@@ -277,24 +311,21 @@ class ValueMapVisualizer:
                     range=[self.plot_bounds_min[2], self.plot_bounds_max[2]],
                     autorange=False,
                 ),
-            ),
-            scene_aspectmode="manual",
-            scene_aspectratio=dict(
+                aspectmode="manual",
+                aspectratio=dict(
                 x=self.scene_scale[0], y=self.scene_scale[1], z=self.scene_scale[2]
             ),
         )
 
         # do not show grid and axes
-        fig.update_layout(
-            scene=dict(
+        fig.update_scenes(
                 xaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
                 yaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
                 zaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
-            ),
         )
 
         # set background color as white
-        fig.update_layout(template="none")
+        # fig.update_scenes(template="none")
 
         fig.add_trace(
             go.Scatter(
