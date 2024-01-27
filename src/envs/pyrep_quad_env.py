@@ -156,12 +156,12 @@ class VoxPoserPyRepQuadcopterEnv:
         # it should be attention the category label is different from the object label
         # object label = (category label + 1) * category_multiplier + instance id as 0 represent background
         self.name2categerylabel = {
-            name: i for i, name in enumerate(self.target_objects)
+            name: i for i, name in enumerate(self.target_objects, start=1) # the category label start from 1 as 0 represent background
         }
         self.categerylabel2name = {
-            i: name for i, name in enumerate(self.target_objects)
+            i: name for i, name in enumerate(self.target_objects, start=1) # the category label start from 1 as 0 represent background
         }
-        self.descriptions = ["its task description"]
+        self.descriptions = ["go to the table"]
 
         self._pyrep.start()
 
@@ -175,9 +175,7 @@ class VoxPoserPyRepQuadcopterEnv:
         Returns:
             tuple: A tuple containing object points and object normals.
         """
-        assert (
-            query_name in self.get_object_names()
-        ), f"Unknown object name: {query_name}"
+        assert query_name in self.target_objects, f"Unknown object name: {query_name}"
         points, masks, normals = [], [], []
         if cameras is None:
             cameras = self.camera_names
@@ -215,7 +213,7 @@ class VoxPoserPyRepQuadcopterEnv:
         category_label = self.name2categerylabel[query_name]  # 1
         # objs_mask: [0,101,102,0,0,0,0,0,0]
         masks[~np.isin(categery_masks, category_label)] = 0  # [0,101,102,0,0,0,0,0,0]
-        if np.any(masks):
+        if not np.any(masks):
             # which masks == [0,0,0,0,0,0,0,0,0] if category_label == 4
             warnings.warn(f"Object {query_name} not found in the scene")
             return None
@@ -242,8 +240,14 @@ class VoxPoserPyRepQuadcopterEnv:
             obj_normals = np.asarray(pcd_downsampled.normals)
             objs_points.append(obj_points)
             objs_normals.append(obj_normals)
+            o3d.io.write_point_cloud(f"target_{query_name}_{obj_ins_id}.pcd",pcd)
+            o3d.io.write_point_cloud(f"target_ds_{query_name}_{obj_ins_id}.pcd",pcd_downsampled)
+            if self.visualizer is not None:
+                self.visualizer.add_object_points(
+                    np.asarray(pcd.points), f"{query_name}_{obj_ins_id}"
+                )
         print(f"we find {len(objs_points)} instances of {query_name}")
-        return objs_points, objs_normals
+        return zip(objs_points, objs_normals)
 
     def get_scene_3d_obs(self, ignore_robot=False, ignore_grasped_obj=False):
         """
@@ -257,8 +261,6 @@ class VoxPoserPyRepQuadcopterEnv:
             tuple: A tuple containing scene points and colors.
         """
         points, masks, normals = [], [], []
-        if cameras is None:
-            cameras = self.camera_names
         for cam in self.camera_names:
             depth_frame = getattr(self.latest_obs, f"{cam}_depth")
             point = convert_depth_to_pointcloud(

@@ -225,7 +225,7 @@ class Controller:
 
 
 class SimpleQuadcopterController:
-    def __init__(self, env: VoxPoserPyRepQuadcopterEnv) -> None:
+    def __init__(self, env: VoxPoserPyRepQuadcopterEnv, config) -> None:
         assert (
             type(env) == VoxPoserPyRepQuadcopterEnv
         ), "env type should be VoxPoserPyRepQuadcopterEnv"
@@ -252,10 +252,11 @@ class SimpleQuadcopterController:
         object_centric = is_object_centric
         # move to target pose directly
         if not object_centric:
-            target_pose = np.concatenate([target_xyz, 0, 0, 0, 1])
+            target_pose = np.concatenate([target_xyz, [0, 0, 0, 1]])
             result = self.env.apply_action(target_pose)
             info["mp_info"] = 0  # for success
         else:
             raise NotImplementedError(
                 "not implement execute when movable is not qudacopter"
             )
+        return info

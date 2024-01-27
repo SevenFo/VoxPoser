@@ -11,3 +11,4 @@ src/pretrained_models/
 .ipynb_checkpoints/
 .virtual_documents/
 *.pcd
+.download.json

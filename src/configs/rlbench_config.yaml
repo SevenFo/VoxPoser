@@ -14,6 +14,7 @@ planner:
   pushing_skip_per_k: 5
 
 controller:
+  type: Controller
   horizon_length: 1
   num_samples: 10000
   ee_local: temperature

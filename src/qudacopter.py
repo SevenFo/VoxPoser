@@ -39,6 +39,7 @@ class Quadcopter(Object):
         else:
             # if the target position is less than 0.2m away from the current position, just set the target position
             self._goto(position)
+            return []
 
     def action_is_reached(self, position, tolerance=0.05):
         # print("distance: ", self.get_distance_between(self.get_position(), position))

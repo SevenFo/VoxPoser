@@ -13,7 +13,8 @@ from planners import PathPlanner
 import time
 from scipy.ndimage import distance_transform_edt
 import transforms3d
-from controllers import Controller
+from controllers import Controller, SimpleQuadcopterController
+import controllers
 
 from envs.rlbench_env import VoxPoserRLBench
 from envs.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
@@ -56,7 +57,11 @@ class LMP_interface:
         self._cfg = lmp_config
         self._map_size = self._cfg["map_size"]
         self._planner = PathPlanner(planner_config, map_size=self._map_size)
-        self._controller = Controller(self._env, controller_config)
+        _controller_type = controller_config["type"]
+        if _controller_type == "SimpleQuadcopterController":
+            self._controller = SimpleQuadcopterController(self._env, controller_config)
+        else:
+            self._controller = Controller(self._env, controller_config)
         self.is_quad_env = type(self._env) == VoxPoserPyRepQuadcopterEnv
         # calculate size of each voxel (resolution)
         self._resolution = (
@@ -230,7 +235,7 @@ class LMP_interface:
             obs_dict["position"] = self.get_ee_pos()
             obs_dict["aabb"] = np.array([self.get_ee_pos(), self.get_ee_pos()])
             obs_dict["_position_world"] = self._env.get_ee_pos()
-            return [Observation(obs_dict)][0]
+            return [Observation(obs_dict)]
         else:
             obs_results = self._env.get_3d_obs_by_name_by_vlm(obj_name)
             if obs_results is None:
@@ -259,7 +264,7 @@ class LMP_interface:
                 obs_dict["_point_cloud_world"] = obj_pc  # in world frame
                 obs_dict["normal"] = normalize_vector(obj_normal.mean(axis=0))
                 object_obs_list.append(Observation(obs_dict))
-        return object_obs_list[0]  # for test
+        return object_obs_list  # for test
 
     def execute_quad(
         self,
