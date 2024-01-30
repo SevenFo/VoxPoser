@@ -92,7 +92,7 @@ class ERNIE:
         self._model_instruction = kwargs[
             "model_instruction"
         ]  # default model instruction
-        self._temperature = 0.8  # default temperature
+        self._temperature = 0.1  # default temperature 0.8
         self._system_instruction = kwargs[
             "model_system_instruction"
         ]  # default system instruction
@@ -125,6 +125,7 @@ class ERNIE:
         if "model_instruction" in kwds.keys():
             # override the model instruction but not override the system instruction
             # so we can adjust the model instruction for any call
+            # TODO
             model_instruction = kwds["model_instruction"]
         if "stop" in kwds.keys():
             stop_tokens = kwds["stop"]
@@ -213,6 +214,8 @@ class Spark:
         )
         self._domain = kwargs["domain"]
         self._max_tokens = 512
+        self._temperature = 0.1
+        self._system_instruction = kwargs["system_instruction"]
         self.answer = ""
         self.message = []
 
@@ -259,7 +262,7 @@ class Spark:
             "parameter": {
                 "chat": {
                     "domain": self._domain,
-                    "temperature": 1.0,
+                    "temperature": self._temperature,
                     "max_tokens": self._max_tokens,
                 }
             },
@@ -273,6 +276,8 @@ class Spark:
         prompt, splited_prompt = kwargs["prompt"]  # add other params
         if "max_token" in kwargs.keys():
             self._max_tokens = kwargs["max_tokens"]
+        if "temperature" in kwargs.keys():
+            self._temperature = kwargs["temperature"]
         # for m in kwargs["prompt"]:
         #     assert (
         #         "role" in m.keys() and "content" in m.keys()
@@ -284,7 +289,15 @@ class Spark:
         if "model_instruction" in kwargs.keys():
             # override the model instruction but not override the system instruction
             # so we can adjust the model instruction for any call
+            # TODO
             model_instruction = kwargs["model_instruction"]
+        if self._system_instruction != '': # 其实更适合放在gen_param函数里面
+            self.message.append(
+                {
+                    "role": "system",
+                    "content": self._system_instruction,
+                }
+            )
         for idx, content in enumerate(splited_prompt):
             self.message.append(
                 {

@@ -76,7 +76,7 @@ class LMP:
         if any(
             [
                 chat_model in kwargs["model"]
-                for chat_model in ["gpt-3.5", "gpt-4", "SparkV3", "ERNIEV4"]
+                for chat_model in ["gpt-3.5", "gpt-4", "SparkV3", "ERNIEV4", "SparkV3.5"]
             ]
         ):
             ret = self._engine_call(
@@ -111,10 +111,10 @@ class LMP:
                 )
                 break
             except (RateLimitError, APIConnectionError) as e:
-                print(f"OpenAI API got err {e}")
+                print(f"LLM API got err {e}")
                 print("Retrying after 3s.")
                 sleep(3)
-        print(f"*** OpenAI API call took {time.time() - start_time:.2f}s ***")
+        print(f"*** LLM API call took {time.time() - start_time:.2f}s ***")
 
         if self._cfg["include_context"]:
             assert self._context is not None, "context is None"
