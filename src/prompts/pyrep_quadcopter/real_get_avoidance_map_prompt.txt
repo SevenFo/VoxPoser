@@ -46,3 +46,11 @@ if  blue_circle is None:
     ret_val = affordance_map
 set_voxel_by_radius(avoidance_map, blue_circle.position, radius_cm=10, value=1)
 ret_val = avoidance_map
+
+# Query: the table
+avoidance_map = get_empty_avoidance_map()
+blue_circle = parse_query_obj('table')
+if  table is None:
+    ret_val = table
+avoidance_map = table.occupancy_map
+ret_val = avoidance_map

@@ -19,3 +19,7 @@ execute(movable, affordance_map=affordance_map, avoidance_map=get_avoidance_map)
 
 # Query: move from under the table until it is completely across the table
 # todo
+movable = parse_query_obj('quadricopter')
+affordance_map = get_affordance_map("a line passed under the table")
+avoidance_map = get_avoidance_map('the table')
+execute(movable, affordance_map=affordance_map, avoidance_map=get_avoidance_map)

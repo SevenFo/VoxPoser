@@ -180,4 +180,10 @@ x = center_x
 y = min_y - cm2index(5, 'y')
 z = max_z + cm2index(10, 'z')
 affordance_map[x, y, z] = 1
-ret_val = affordance_mapS
+ret_val = affordance_map
+
+# Query: a line passed under the table
+affordance_map = get_empty_affordance_map()
+table = parse_query_obj('table')
+if table is None:
+    ret_val = table
