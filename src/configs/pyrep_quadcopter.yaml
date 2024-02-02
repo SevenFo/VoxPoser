@@ -123,18 +123,18 @@ lmp_config:
       has_return: True
       return_val_name: ret_val
       load_cache: True
-    get_rotation_map:
-      prompt_fname: real_get_rotation_map_prompt
-      model: Dummy
-      max_tokens: 512
-      temperature: 0.3
-      query_prefix: '# Query: '
-      query_suffix: '.'
-      stop:
-        - '# Query: '
-        - 'objects ='
-      maintain_session: False
-      include_context: False
-      has_return: True
-      return_val_name: ret_val
-      load_cache: True
+    # get_rotation_map:
+    #   prompt_fname: real_get_rotation_map_prompt
+    #   model: Dummy
+    #   max_tokens: 512
+    #   temperature: 0.3
+    #   query_prefix: '# Query: '
+    #   query_suffix: '.'
+    #   stop:
+    #     - '# Query: '
+    #     - 'objects ='
+    #   maintain_session: False
+    #   include_context: False
+    #   has_return: True
+    #   return_val_name: ret_val
+    #   load_cache: True

@@ -30,6 +30,8 @@ EE_ALIAS = [
     "copter",
     "quadricopter",
     "UAV",
+    "quadcopter",
+    "controlled object"
 ]
 TABLE_ALIAS = [
     "table",

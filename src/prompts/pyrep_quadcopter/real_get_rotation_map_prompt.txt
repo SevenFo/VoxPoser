@@ -4,6 +4,7 @@ from perception_utils import parse_query_obj
 from transforms3d.euler import euler2quat, quat2euler
 from transforms3d.quaternions import qmult, qinverse
 
+# *****************************以下未修改************************ #
 # Query: face the support surface of the bowl.
 rotation_map = get_empty_rotation_map()
 bowl = parse_query_obj('bowl')

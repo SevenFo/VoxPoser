@@ -139,7 +139,7 @@ class VoxPoserPyRepQuadcopterEnv:
         Returns:
             list: A list of object names.
         """
-        return ["table"]
+        return ["quadcopter","table"] # fix for test
 
     def init_task(self):
         """
@@ -163,7 +163,7 @@ class VoxPoserPyRepQuadcopterEnv:
         self.categerylabel2name = {
             i: name for i, name in enumerate(self.target_objects, start=1) # the category label start from 1 as 0 represent background
         }
-        self.descriptions = ["go to the table"]
+        self.descriptions = ["fly around the table","From under the table, cross the past to the 100cm in front of the table, then fly to the top 100cm above the table","fly to the table, please"]
 
         self._pyrep.start()
 
@@ -355,7 +355,7 @@ class VoxPoserPyRepQuadcopterEnv:
         self._pyrep.stop()
         self._pyrep.start()
 
-        descriptions = self.descriptions[0]
+        descriptions = self.descriptions[1]
         obs = self.get_obs()
         self.init_obs = obs
         self.latest_obs = obs

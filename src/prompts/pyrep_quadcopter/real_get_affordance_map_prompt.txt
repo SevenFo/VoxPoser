@@ -2,6 +2,19 @@ import numpy as np
 from perception_utils import parse_query_obj
 from plan_utils import get_empty_affordance_map, set_voxel_by_radius, cm2index
 
+# Query: a point 10cm above the table.
+affordance_map = get_empty_affordance_map()
+table_obj = parse_query_obj('table')
+if table_obj is None:
+    ret_val = affordance_map
+(min_x, min_y, min_z), (max_x, max_y, max_z) = table_obj.aabb
+center_x, center_y, center_z = table_obj.position
+x = center_x
+y = center_y
+z = max_z + cm2index(10, 'z')
+affordance_map[x, y, z] = 1
+ret_val = affordance_map
+
 # Query: a point 10cm in front of [10, 15, 60].
 affordance_map = get_empty_affordance_map()
 # 10cm in front of so we add to x-axis
@@ -14,6 +27,8 @@ ret_val = affordance_map
 # Query: a point on the right side of the table.
 affordance_map = get_empty_affordance_map()
 table = parse_query_obj('table')
+if table is None:
+    ret_val = affordance_map
 (min_x, min_y, min_z), (max_x, max_y, max_z) = table.aabb
 center_x, center_y, center_z = table.position
 # right side so y = max_y
@@ -26,6 +41,8 @@ ret_val = affordance_map
 # Query: a point 20cm on top of the container.
 affordance_map = get_empty_affordance_map()
 container = parse_query_obj('container')
+if container is None:
+    ret_val = affordance_map
 (min_x, min_y, min_z), (max_x, max_y, max_z) = container.aabb
 center_x, center_y, center_z = container.position
 # 20cm on top of so we add to z-axis
@@ -38,6 +55,8 @@ ret_val = affordance_map
 # Query: a point 1cm to the left of the brown block.
 affordance_map = get_empty_affordance_map()
 brown_block = parse_query_obj('brown block')
+if brown_block is None:
+    ret_val = affordance_map
 (min_x, min_y, min_z), (max_x, max_y, max_z) = brown_block.aabb
 center_x, center_y, center_z = brown_block.position
 # 1cm to the left of so we subtract from y-axis
@@ -50,11 +69,15 @@ ret_val = affordance_map
 # Query: anywhere within 20cm of the right most block.
 affordance_map = get_empty_affordance_map()
 right_most_block = parse_query_obj('the right most block')
+if right_most_block is None:
+    ret_val = affordance_map
 set_voxel_by_radius(affordance_map, right_most_block.position, radius_cm=20, value=1)
 
 # Query: a point on the back side of the table.
 affordance_map = get_empty_affordance_map()
 table = parse_query_obj('table')
+if table is None:
+    ret_val = affordance_map
 (min_x, min_y, min_z), (max_x, max_y, max_z) = table.aabb
 center_x, center_y, center_z = table.position
 # back side so x = min_x
@@ -67,6 +90,8 @@ ret_val = affordance_map
 # Query: a point on the front right corner of the table.
 affordance_map = get_empty_affordance_map()
 table = parse_query_obj('table')
+if table is None:
+    ret_val = affordance_map
 (min_x, min_y, min_z), (max_x, max_y, max_z) = table.aabb
 center_x, center_y, center_z = table.position
 # front right corner so x = max_x and y = max_y
@@ -79,6 +104,8 @@ ret_val = affordance_map
 # Query: a point 30cm into the topmost drawer handle.
 affordance_map = get_empty_affordance_map()
 top_handle = parse_query_obj('topmost drawer handle')
+if table is None:
+    ret_val = top_handle
 # negative normal because we are moving into the handle.
 moving_dir = -top_handle.normal
 affordance_xyz = top_handle.position + cm2index(30, moving_dir)
@@ -88,6 +115,8 @@ ret_val = affordance_map
 # Query: a point 5cm above the blue block.
 affordance_map = get_empty_affordance_map()
 blue_block = parse_query_obj('blue block')
+if blue_block is None:
+    ret_val = affordance_map
 (min_x, min_y, min_z), (max_x, max_y, max_z) = blue_block.aabb
 center_x, center_y, center_z = blue_block.position
 # 5cm above so we add to z-axis
@@ -100,6 +129,8 @@ ret_val = affordance_map
 # Query: a point 20cm away from the leftmost block.
 affordance_map = get_empty_affordance_map()
 leftmost_block = parse_query_obj('leftmost block')
+if leftmost_block is None:
+    ret_val = affordance_map
 # positive normal because we are moving away from the block.
 moving_dir = leftmost_block.normal
 affordance_xyz = leftmost_block.position + cm2index(20, moving_dir)
@@ -109,6 +140,8 @@ ret_val = affordance_map
 # Query: a point 4cm to the left of and 10cm on top of the tray that contains the lemon.
 affordance_map = get_empty_affordance_map()
 tray_with_lemon = parse_query_obj('tray that contains the lemon')
+if tray_with_lemon is None:
+    ret_val = affordance_map
 (min_x, min_y, min_z), (max_x, max_y, max_z) = tray_with_lemon.aabb
 center_x, center_y, center_z = tray_with_lemon.position
 # 4cm to the left of so we subtract from y-axis, and 10cm on top of so we add to z-axis
@@ -130,12 +163,16 @@ ret_val = affordance_map
 # Query: the blue circle.
 affordance_map = get_empty_affordance_map()
 blue_circle = parse_query_obj('blue circle')
+if blue_circle is None:
+    ret_val = affordance_map
 affordance_map = blue_circle.occupancy_map
 ret_val = affordance_map
 
 # Query: a point 10cm above and 5cm to the left of the yellow bowl.
 affordance_map = get_empty_affordance_map()
 yellow_bowl = parse_query_obj('yellow bowl')
+if yellow_bowl is None:
+    ret_val = affordance_map
 (min_x, min_y, min_z), (max_x, max_y, max_z) = yellow_bowl.aabb
 center_x, center_y, center_z = yellow_bowl.position
 # 10cm above so we add to z-axis, and 5cm to the left of so we subtract from y-axis

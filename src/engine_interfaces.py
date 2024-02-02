@@ -1,7 +1,7 @@
 import _thread as thread
 import base64, requests
 from typing import Any
-import datetime
+import datetime, os
 import hashlib
 import hmac
 import json
@@ -20,8 +20,11 @@ import websocket  # 使用websocket_client
 def extract_content(text):
     # pattern = r"```(?!.*\n```$)\s(.*?)\s```"  # 这段regex好像不太好
     pattern = r"```.*\n([\s\S]*?)```"  # 捕获python代码块中的内容
+    pattern = r"```python\s*\n([\s\S]*?)\s*```"  # 捕获python代码块中的内容
     # result = re.sub(r"[\u4e00-\u9fa5]+|[，。；；【】、！]+", "", text)    # 清除字符串中的中文
     matches = re.findall(pattern, text, re.DOTALL)
+    if len(matches) == 0:
+        return [text]
     return matches
 
 
@@ -96,7 +99,11 @@ class ERNIE:
         self._system_instruction = kwargs[
             "model_system_instruction"
         ]  # default system instruction
-        self._cache = DiskCache(load_cache=self._load_cache)
+        self._cache_root_dir = kwargs["cache_root_dir"]
+        self._cache_dir_base = os.path.join(self._cache_root_dir, self._full_name)
+        if not os.path.exists(self._cache_dir_base):
+            os.makedirs(self._cache_dir_base)
+        self._cache = DiskCache(load_cache=self._load_cache, cache_dir=self._cache_dir_base)
 
     def get_access_token(self):
         """
@@ -215,7 +222,10 @@ class Spark:
         self._domain = kwargs["domain"]
         self._max_tokens = 512
         self._temperature = 0.1
-        self._system_instruction = kwargs["system_instruction"]
+        if 'system_instruction' not in kwargs:
+            self._system_instruction = ''
+        else:
+            self._system_instruction = kwargs["system_instruction"]
         self.answer = ""
         self.message = []
 
