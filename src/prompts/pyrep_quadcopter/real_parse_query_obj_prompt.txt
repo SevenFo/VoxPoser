@@ -7,9 +7,9 @@ table = detect('table')
 ret_val = table[0]
 
 objects = ['quadcopter', 'table', 'tank']
-# Query: quadricopter.
-quadricopter = detect('quadricopter')
-ret_val = quadricopter[0]
+# Query: quadcopter.
+quadcopter = detect('quadcopter')
+ret_val = quadcopter[0]
 
 objects = ['quadcopter', 'yellow block', 'charging cable', 'cyan block', 'magenta block']
 # Query: second to the left block.

@@ -182,8 +182,13 @@ z = max_z + cm2index(10, 'z')
 affordance_map[x, y, z] = 1
 ret_val = affordance_map
 
-# Query: a line passed under the table
+# Query: a circle above the tank 30cm with a radius of 50cm.
 affordance_map = get_empty_affordance_map()
-table = parse_query_obj('table')
-if table is None:
-    ret_val = table
+tank = parse_query_obj('tank')
+if tank is None:
+    ret_val = affordance_map
+(min_x, min_y, min_z), (max_x, max_y, max_z) = tank.aabb
+center_x, center_y, center_z = tank.position
+radius = cm2index(50/2)
+set_voxel_by_radius(affordance_map, [center_x,center_y,max_z+cm2index(30)], radius_cm=[radius,radius,0], value=1)
+ret_val = affordance_map
