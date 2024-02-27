@@ -93,8 +93,10 @@ class ValueMapVisualizer:
         self.scene_points = (points, colors)
 
     def add_object_points(self, points, label):
-        points = points.astype(np.float16)
-        self.objects_points.append((points, label))
+        added_labels = [l for _, l in self.objects_points]
+        if label not in added_labels:
+            points = points.astype(np.float16)
+            self.objects_points.append((points, label))
 
     def update_depth_map(self, depth_map):
         self.depth_map = depth_map
@@ -217,6 +219,51 @@ class ValueMapVisualizer:
                         showlegend=True,
                         showscale=False,
                         name="costmap",
+                    )
+                )
+            if "affordance_map" in info:
+                # Downsample the costmap, :: means sample points every downsample_ratio
+                affordance_map = info["affordance_map"][
+                    :: self.downsample_ratio,
+                    :: self.downsample_ratio,
+                    :: self.downsample_ratio,
+                ]
+                # Calculate the skip ratio for grid points
+                skip_ratio = (self.workspace_bounds_max - self.workspace_bounds_min) / (
+                    self.map_size / self.downsample_ratio
+                )
+                # Generate the grid points, mgrid is similar to meshgrid, which takes the start, end, and step size for each dimension
+                x, y, z = np.mgrid[
+                    self.workspace_bounds_min[0] : self.workspace_bounds_max[
+                        0
+                    ] : skip_ratio[0],
+                    self.workspace_bounds_min[1] : self.workspace_bounds_max[
+                        1
+                    ] : skip_ratio[1],
+                    self.workspace_bounds_min[2] : self.workspace_bounds_max[
+                        2
+                    ] : skip_ratio[2],
+                ]
+                grid_shape = affordance_map.shape
+                # Trim the grid points to match the affordance_map shape
+                x = x[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
+                y = y[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
+                z = z[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
+                # Add the affordance_map as a volume plot
+                fig_data.append(
+                    go.Volume(
+                        x=x.flatten(),
+                        y=y.flatten(),
+                        z=z.flatten(),
+                        value=affordance_map.flatten(),
+                        isomin=0,
+                        isomax=1,
+                        opacity=self.costmap_opacity,
+                        surface_count=self.costmap_surface_count,
+                        colorscale="Jet",
+                        showlegend=True,
+                        showscale=True,
+                        name="affordance_map",
                     )
                 )
             # plot start position
@@ -362,6 +409,7 @@ class ValueMapVisualizer:
                 row=1,
                 col=2,
             )
+        self.objects_points = []
 
         # save and show
         if save and self.save_dir is not None:

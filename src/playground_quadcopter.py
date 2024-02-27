@@ -25,7 +25,8 @@ xmem_model_path = "/models/XMem.pth"
 resnet_18_path = "/models/resnet18.pth"
 resnet_50_path = "/models/resnet50.pth"
 config_path = "configs/pyrep_quadcopter.yaml"
-scene_path = "./scene/quadcopter.ttt"
+scene_path = "./scene/quadcopter_tree_sofa_helicopter.ttt"
+scene_target_objects = ["quadcopter","sofa","tree","helicopter","table"]
 env_config = get_config(config_path=config_path)
 vlmpipeline = VLM(
     owlv2_model_path,
@@ -47,18 +48,23 @@ sparkv35_engine_config = load_config(
 erniev4_engine_config = load_config(
     "/mnt/workspace/src/configs/ERNIEv4_config.yaml"
 )
+tgi_config = load_config(
+    "/mnt/workspace/src/configs/TGI_deepseek-coder-6.7B-instruct-AWQ.yaml"
+)
 engine_erniev4 = getattr(engine_interfaces, erniev4_engine_config["type"])(
     **erniev4_engine_config
 )  # engine initialization
 engine_sparkv3 = getattr(engine_interfaces, sparkv3_engine_config["type"])(
     **sparkv35_engine_config
 )  # engine initialization
-
+engine_tgi_deepseek = getattr(engine_interfaces, tgi_config["type"])(
+    **tgi_config)  # engine initialization
 
 visualizer = ValueMapVisualizer(env_config['visualizer'])
-env = VoxPoserPyRepQuadcopterEnv(visualizer=visualizer,headless=True,coppelia_scene_path=scene_path,vlmpipeline=vlmpipeline)
+env = VoxPoserPyRepQuadcopterEnv(visualizer=visualizer,headless=True,coppelia_scene_path=scene_path,vlmpipeline=vlmpipeline, target_objects=scene_target_objects)
 descriptions, obs = env.reset()
-lmps, lmp_env = setup_LMP(env, env_config, debug=False, engine_call_fn=engine_sparkv3)
+descriptions = "fly to the table, then fly to the tree, and at last fly to the sofa"
+lmps, lmp_env = setup_LMP(env, env_config, debug=False, engine_call_fn=engine_tgi_deepseek)
 voxposer_ui = lmps['plan_ui']
 set_lmp_objects(lmps, env.get_object_names())
 

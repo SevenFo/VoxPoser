@@ -24,7 +24,15 @@ controlled_object = parse_query_obj('controlled object')
 current_position = controlled_object.position
 composer("move to a point 100cm above the mug")
 composer(f"move to a point 100cm to the left of {current_position}")
+
+objects = ['blue block', 'yellow block', 'table']
+# Query: fly through the table. 
+composer('move from under the table until it is completely across the table')
 # done
+
+objects = ['cup', 'tank']
+# Query: fly around the tank
+composer("move along a circular path above the tank, ensuring that the diameter of the path is not larger than the diameter of the tank's rim")
 
 objects = ['table', 'cup']
 # Query: fly over the table and back
@@ -32,4 +40,3 @@ controlled_object = parse_query_obj('controlled object')
 current_position = controlled_object.position
 composer("move to 10cm above the table")
 composer(f"move to {current_position}")
-# done

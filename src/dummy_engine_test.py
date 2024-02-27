@@ -46,7 +46,7 @@ lmps, lmp_env = setup_LMP(env, config, debug=False, engine_call_fn=dummy_engine.
 voxposer_ui = lmps['plan_ui']
 set_lmp_objects(lmps, env.get_object_names())
 
-voxposer_ui(descriptions)
+voxposer_ui(env.descriptions[-1])
 
 env._pyrep.stop()
 env._pyrep.shutdown()

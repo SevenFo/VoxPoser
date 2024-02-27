@@ -203,7 +203,120 @@ class ERNIE:
         self._cache[cache_key] = ret
         return ret
 
+class TGI:
+    """
+    class that warp the interface of TGI
+    """
+    def __init__(self, **kwargs) -> None:
+        self._full_name = kwargs["type"] + kwargs["version"]
+        self._url = kwargs["url"] + ':' + str(kwargs["port"])
+        self._model_instruction = kwargs["model_instruction"]
+        self._load_cache = False
+        self._temperature = 0.1
+        if 'system_instruction' not in kwargs:
+            self._system_instruction = ''
+        else:
+            self._system_instruction = kwargs["system_instruction"]
+        if "load_cache" in kwargs:
+            self._load_cache = kwargs["load_cache"]
+        self._cache_root_dir = kwargs["cache_root_dir"]
+        self._cache_dir_base = os.path.join(self._cache_root_dir, self._full_name)
+        if not os.path.exists(self._cache_dir_base):
+            os.makedirs(self._cache_dir_base)
+        self._cache = DiskCache(load_cache=self._load_cache, cache_dir=self._cache_dir_base)
 
+    def __call__(self, **kwds: Any) -> Any:
+        assert "prompt" in kwds.keys(), "engine call kwargs not contain messages"
+        prompt, splited_prompt = kwds["prompt"]
+        assert (
+            len(splited_prompt) % 2 == 1
+        ), f"len(splited_prompt)={len(splited_prompt)}, please ask assistant"
+        use_cache = False  # whether or not checking cache before calling API online
+        if "use_cache" in kwds and self._load_cache:
+            use_cache = kwds["use_cache"]
+        temperature = self._temperature  # get default temperature
+        stop_tokens = []
+        model_instruction = self._model_instruction  # get default model_instruction
+        if "model_instruction" in kwds.keys():
+            # override the model instruction but not override the system instruction
+            # so we can adjust the model instruction for any call
+            # TODO
+            model_instruction = kwds["model_instruction"]
+        if "stop" in kwds.keys():
+            stop_tokens = kwds["stop"]
+        if "temperature" in kwds.keys():
+            # override the default temperature if it in kwds
+            temperature = kwds["temperature"]
+        messages = []
+        messages.append(
+            {
+                "role": "system",
+                "content": self._system_instruction,
+            }
+        )
+        for idx, content in enumerate(splited_prompt):
+            messages.append(
+                {
+                    "role": ["user", "assistant"][idx % 2],
+                    "content": [model_instruction + "\n\n" + content + "\n\n", content][
+                        idx % 2
+                    ],
+                }
+            )
+        inputs = f"{self._system_instruction} \n\n {prompt}"
+        parameters = {
+            "max_new_tokens": 512,
+            "temperature": temperature,
+            "stop": stop_tokens,
+            "do_sample": True
+        }
+        payload = json.dumps(
+            {
+                "model": "tgi",
+                "messages": messages,
+                "temperature": temperature,
+                "stop": stop_tokens,
+            }
+        )
+        payload = json.dumps(
+            {
+                "inputs": inputs,
+                "parameters": parameters
+            }
+        )
+        headers = {"Content-Type": "application/json"}
+        try:
+            # response = requests.request(
+            #     "POST",
+            #     f'{self._url}/v1/chat/completions',
+            #     headers=headers,
+            #     data=payload,
+            # )
+            response = requests.request(
+                "POST",
+                f'{self._url}/generate',
+                headers=headers,
+                data=payload,
+            )
+            code_str = response.json()["generated_text"]
+        except KeyError as e:
+            print("KeyError:", e)
+            print(response.content)
+            print(payload)
+            exit(1)
+            # todo: if reach the max length of API limit, need to switch to a shorter version
+
+        code_segments = extract_content(code_str)
+        if len(code_segments) > 0:
+            ret = code_segments[0].strip()
+        else:
+            ret = chinese_filter(code_str).strip()
+
+        # whatever caching the result
+        # self._cache[cache_key] = ret
+        return ret
+
+        
 class Spark:
     def __init__(self, **kwargs) -> None:
         websocket.enableTrace(False)

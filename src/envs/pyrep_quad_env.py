@@ -57,6 +57,7 @@ class VoxPoserPyRepQuadcopterEnv:
         visualizer: ValueMapVisualizer = None,
         headless=False,
         vlmpipeline: VLM = None,
+        target_objects =  ["quadcopter","table"]
     ):
         """
         Initializes the VoxPoserRLBench environment.
@@ -66,6 +67,7 @@ class VoxPoserPyRepQuadcopterEnv:
             headless (bool, optional): whether to run the environment in headless mode.
             VILMPipeline (optional): VILMPipeline object, input frame and objects output object masks.
         """
+        self._target_objects = target_objects
         self._cam_config = CameraConfig(
             rgb=True,
             depth=True,
@@ -139,7 +141,7 @@ class VoxPoserPyRepQuadcopterEnv:
         Returns:
             list: A list of object names.
         """
-        return ["quadcopter","table"] # fix for test
+        return self._target_objects
 
     def init_task(self):
         """
@@ -163,7 +165,7 @@ class VoxPoserPyRepQuadcopterEnv:
         self.categerylabel2name = {
             i: name for i, name in enumerate(self.target_objects, start=1) # the category label start from 1 as 0 represent background
         }
-        self.descriptions = ["fly around the table","From under the table, cross the past to the 100cm in front of the table, then fly to the top 100cm above the table","fly to the table, please"]
+        self.descriptions = ["fly around a distance above the table","From under the table, cross the past to the 100cm in front of the table, then fly to the top 100cm above the table","fly to the table","go to the table"]
 
         self._pyrep.start()
 
@@ -238,15 +240,14 @@ class VoxPoserPyRepQuadcopterEnv:
             pcd.points = o3d.utility.Vector3dVector(obj_points)
             pcd.normals = o3d.utility.Vector3dVector(obj_normals)
             pcd_downsampled = pcd.voxel_down_sample(voxel_size=0.001)
-            obj_points = np.asarray(pcd_downsampled.points)
-            obj_normals = np.asarray(pcd_downsampled.normals)
+            pcd_downsampled_filted, ind = pcd_downsampled.remove_statistical_outlier(nb_neighbors=20, std_ratio=1.0)
+            obj_points = np.asarray(pcd_downsampled_filted.points)
+            obj_normals = np.asarray(pcd_downsampled_filted.normals)
             objs_points.append(obj_points)
             objs_normals.append(obj_normals)
-            o3d.io.write_point_cloud(f"target_{query_name}_{obj_ins_id}.pcd",pcd)
-            o3d.io.write_point_cloud(f"target_ds_{query_name}_{obj_ins_id}.pcd",pcd_downsampled)
             if self.visualizer is not None:
                 self.visualizer.add_object_points(
-                    np.asarray(pcd.points), f"{query_name}_{obj_ins_id}"
+                    np.asarray(pcd_downsampled_filted.points), f"{query_name}_{obj_ins_id}"
                 )
         print(f"we find {len(objs_points)} instances of {query_name}")
         return zip(objs_points, objs_normals)
@@ -355,7 +356,7 @@ class VoxPoserPyRepQuadcopterEnv:
         self._pyrep.stop()
         self._pyrep.start()
 
-        descriptions = self.descriptions[1]
+        descriptions = self.descriptions[0]
         obs = self.get_obs()
         self.init_obs = obs
         self.latest_obs = obs
@@ -367,7 +368,7 @@ class VoxPoserPyRepQuadcopterEnv:
                 [2, 0, 1]
             )
         frames = np.stack(list(rgb_frames.values()), axis=0)
-        masks = self.vlm.process_first_frame(self.target_objects, frames, verbose=True)
+        masks = self.vlm.process_first_frame(self.target_objects, frames, verbose=True, owlv2_threshold=0.1)
         if not np.any(masks):
             raise ValueError("no intrested object found in the scene, may be you should let robot turn around or change the scene or change the target object")
             return None

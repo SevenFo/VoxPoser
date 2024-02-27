@@ -13,3 +13,4 @@ src/pretrained_models/
 *.pcd
 .download.json
 src/dummy_engine_test.ipynb
+deepseek-coder-6.7b-instruct/

@@ -647,7 +647,7 @@ class LMP_interface:
     def set_voxel_by_radius(self, voxel_map, voxel_xyz, radius_cm=0, value=1):
         """given a 3D np array, set the value of the voxel at voxel_xyz to value. If radius is specified, set the value of all voxels within the radius to value."""
         voxel_map[voxel_xyz[0], voxel_xyz[1], voxel_xyz[2]] = value
-        if type(radius_cm) != type(list) and radius_cm > 0:
+        if type(radius_cm) != list and radius_cm > 0:
             radius_x = self.cm2index(radius_cm, "x")
             radius_y = self.cm2index(radius_cm, "y")
             radius_z = self.cm2index(radius_cm, "z")
@@ -659,7 +659,7 @@ class LMP_interface:
             min_z = max(0, voxel_xyz[2] - radius_z)
             max_z = min(self._map_size, voxel_xyz[2] + radius_z + 1)
             voxel_map[min_x:max_x, min_y:max_y, min_z:max_z] = value
-        elif type(radius_cm) == type(list):
+        elif type(radius_cm) == list:
             assert len(radius_cm) == 3, "radius_cm must be a list of length 3"
             radius_x = self.cm2index(radius_cm[0], "x")
             radius_y = self.cm2index(radius_cm[1], "y")

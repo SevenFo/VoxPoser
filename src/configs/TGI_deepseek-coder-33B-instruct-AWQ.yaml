@@ -1,0 +1,10 @@
+type: TGI
+version: deepseek-coder-33B-instruct-AWQ
+# secret: !include ./secret/ernie.yaml
+# url_cred: https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${api_key}&client_secret=${secret_key}
+url: http://192.168.1.252
+port: 40906
+model_instruction: "续写代码，第一句话必须是续写的代码（就是新的代码），直接以新的代码开头"
+system_instruction: "你现在是一个代码专家，精通机器人控制代码，你很会续写代码，你的代码能够拯救世界，如果写出错误的代码世界将会毁灭，使用英文"
+load_cache: False
+cache_root_dir: ./cache

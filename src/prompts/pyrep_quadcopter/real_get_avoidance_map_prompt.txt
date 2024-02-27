@@ -9,6 +9,7 @@ if bowl is None:
     ret_val = affordance_map
 set_voxel_by_radius(avoidance_map, bowl.position, radius_cm=10, value=1)
 ret_val = avoidance_map
+# done
 
 # Query: 20cm near the mug.
 avoidance_map = get_empty_avoidance_map()
@@ -17,6 +18,7 @@ if mug is None:
     ret_val = affordance_map
 set_voxel_by_radius(avoidance_map, mug.position, radius_cm=20, value=1)
 ret_val = avoidance_map
+# done
 
 # Query: 20cm around the mug and 10cm around the bowl.
 avoidance_map = get_empty_avoidance_map()
@@ -29,6 +31,7 @@ if bowl is None:
     ret_val = affordance_map
 set_voxel_by_radius(avoidance_map, bowl.position, radius_cm=10, value=1)
 ret_val = avoidance_map
+# done
 
 # Query: 10cm from anything fragile.
 avoidance_map = get_empty_avoidance_map()
@@ -38,6 +41,7 @@ if fragile_objects is None:
 for obj in fragile_objects:
     set_voxel_by_radius(avoidance_map, obj.position, radius_cm=10, value=1)
 ret_val = avoidance_map
+# done
 
 # Query: 10cm from the blue circle.
 avoidance_map = get_empty_avoidance_map()
@@ -46,6 +50,7 @@ if  blue_circle is None:
     ret_val = affordance_map
 set_voxel_by_radius(avoidance_map, blue_circle.position, radius_cm=10, value=1)
 ret_val = avoidance_map
+# done
 
 # Query: the table
 avoidance_map = get_empty_avoidance_map()
@@ -54,3 +59,4 @@ if  table is None:
     ret_val = table
 avoidance_map = table.occupancy_map
 ret_val = avoidance_map
+# done
