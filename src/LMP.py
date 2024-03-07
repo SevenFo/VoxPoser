@@ -19,7 +19,7 @@ class LMP:
         fixed_vars,
         variable_vars,
         debug=False,
-        env="rlbench",
+        env="pyrep_quadcopter",
         engine_call_fn=None,
     ):
         self._name = name

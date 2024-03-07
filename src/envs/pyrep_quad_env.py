@@ -60,7 +60,7 @@ class VoxPoserPyRepQuadcopterEnv:
         target_objects =  ["quadcopter","table"]
     ):
         """
-        Initializes the VoxPoserRLBench environment.
+        Initializes the VoxPoserPyRepQuadcopterEnv environment.
 
         Args:
             visualizer: Visualization interface, optional.
