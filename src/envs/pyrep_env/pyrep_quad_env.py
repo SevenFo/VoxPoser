@@ -12,7 +12,7 @@ from utils import normalize_vector, bcolors, Observation
 from visualizers import ValueMapVisualizer
 from VLMPipline.VLM import VLM
 from VLMPipline.utils import convert_depth_to_pointcloud
-from qudacopter import Quadcopter
+from envs.pyrep_env.pyrepqudacopter import PyRepQuadcopter
 
 
 class CameraConfig(object):
@@ -57,7 +57,7 @@ class VoxPoserPyRepQuadcopterEnv:
         visualizer: ValueMapVisualizer = None,
         headless=False,
         vlmpipeline: VLM = None,
-        target_objects =  ["quadcopter","table"]
+        target_objects=["quadcopter", "table"],
     ):
         """
         Initializes the VoxPoserPyRepQuadcopterEnv environment.
@@ -130,7 +130,7 @@ class VoxPoserPyRepQuadcopterEnv:
         # print(f"{bcolors.OKGREEN}Camera parameters:{bcolors.ENDC} {self.camera_params}")
 
         # get quadcopter object
-        self.quadcopter = Quadcopter()
+        self.quadcopter = PyRepQuadcopter()
         self.init_task()
         self.has_processed_first_frame = False
 
@@ -160,12 +160,23 @@ class VoxPoserPyRepQuadcopterEnv:
         # it should be attention the category label is different from the object label
         # object label = (category label + 1) * category_multiplier + instance id as 0 represent background
         self.name2categerylabel = {
-            name: i for i, name in enumerate(self.target_objects, start=1) # the category label start from 1 as 0 represent background
+            name: i
+            for i, name in enumerate(
+                self.target_objects, start=1
+            )  # the category label start from 1 as 0 represent background
         }
         self.categerylabel2name = {
-            i: name for i, name in enumerate(self.target_objects, start=1) # the category label start from 1 as 0 represent background
+            i: name
+            for i, name in enumerate(
+                self.target_objects, start=1
+            )  # the category label start from 1 as 0 represent background
         }
-        self.descriptions = ["fly around a distance above the table","From under the table, cross the past to the 100cm in front of the table, then fly to the top 100cm above the table","fly to the table","go to the table"]
+        self.descriptions = [
+            "fly around a distance above the table",
+            "From under the table, cross the past to the 100cm in front of the table, then fly to the top 100cm above the table",
+            "fly to the table",
+            "go to the table",
+        ]
 
         self._pyrep.start()
 
@@ -240,14 +251,17 @@ class VoxPoserPyRepQuadcopterEnv:
             pcd.points = o3d.utility.Vector3dVector(obj_points)
             pcd.normals = o3d.utility.Vector3dVector(obj_normals)
             pcd_downsampled = pcd.voxel_down_sample(voxel_size=0.001)
-            pcd_downsampled_filted, ind = pcd_downsampled.remove_statistical_outlier(nb_neighbors=20, std_ratio=1.0)
+            pcd_downsampled_filted, ind = pcd_downsampled.remove_statistical_outlier(
+                nb_neighbors=20, std_ratio=1.0
+            )
             obj_points = np.asarray(pcd_downsampled_filted.points)
             obj_normals = np.asarray(pcd_downsampled_filted.normals)
             objs_points.append(obj_points)
             objs_normals.append(obj_normals)
             if self.visualizer is not None:
                 self.visualizer.add_object_points(
-                    np.asarray(pcd_downsampled_filted.points), f"{query_name}_{obj_ins_id}"
+                    np.asarray(pcd_downsampled_filted.points),
+                    f"{query_name}_{obj_ins_id}",
                 )
         print(f"we find {len(objs_points)} instances of {query_name}")
         return zip(objs_points, objs_normals)
@@ -368,11 +382,18 @@ class VoxPoserPyRepQuadcopterEnv:
                 [2, 0, 1]
             )
         frames = np.stack(list(rgb_frames.values()), axis=0)
-        masks = self.vlm.process_first_frame(self.target_objects, frames, verbose=True, owlv2_threshold=0.1)
+        masks = self.vlm.process_first_frame(
+            self.target_objects, frames, verbose=True, owlv2_threshold=0.1
+        )
         if not np.any(masks):
-            raise ValueError("no intrested object found in the scene, may be you should let robot turn around or change the scene or change the target object")
+            raise ValueError(
+                "no intrested object found in the scene, may be you should let robot turn around or change the scene or change the target object"
+            )
             return None
-        [self.latest_mask.update({cam:mask})for cam,mask in zip(self.camera_names,masks)]
+        [
+            self.latest_mask.update({cam: mask})
+            for cam, mask in zip(self.camera_names, masks)
+        ]
         self._update_visualizer()
         self.has_processed_first_frame = True
         return descriptions, obs
@@ -390,7 +411,9 @@ class VoxPoserPyRepQuadcopterEnv:
         Returns:
             tuple: A tuple containing the latest observations, reward, and termination flag.
         """
-        assert self.has_processed_first_frame, "Please reset the environment first or let VLM process the first frame"
+        assert (
+            self.has_processed_first_frame
+        ), "Please reset the environment first or let VLM process the first frame"
         assert (
             len(action) == 7
         ), "the action should be [x,y,z,quaternion] where quaternion is in form of [x,y,z,w]"
@@ -442,9 +465,14 @@ class VoxPoserPyRepQuadcopterEnv:
         frames = np.stack(list(rgb_frames.values()), axis=0)
         masks = self.vlm.process_frame(frames, verbose=True)
         if not np.any(masks):
-            raise ValueError("no intrested object found in the scene, may be you should let robot turn around or change the scene or change the target object")
+            raise ValueError(
+                "no intrested object found in the scene, may be you should let robot turn around or change the scene or change the target object"
+            )
             return None
-        [self.latest_mask.update({cam:mask})for cam,mask in zip(self.camera_names,masks)]
+        [
+            self.latest_mask.update({cam: mask})
+            for cam, mask in zip(self.camera_names, masks)
+        ]
         self._update_visualizer()
         return obs, reward, terminate
 
@@ -498,14 +526,14 @@ class VoxPoserPyRepQuadcopterEnv:
                 ignore_robot=False, ignore_grasped_obj=False
             )
             self.visualizer.update_scene_points(points, colors)
-            fig = plt.figure(figsize=(6.4*len(self.camera_names), 4.8))
+            fig = plt.figure(figsize=(6.4 * len(self.camera_names), 4.8))
             for idx, cam in enumerate(self.camera_names):
                 rgb = getattr(self.latest_obs, f"{cam}_rgb")
-                mask = np.mod(self.latest_mask[cam], 256) # avoid overflow for color
+                mask = np.mod(self.latest_mask[cam], 256)  # avoid overflow for color
                 # create a subfigure for each rgb frame
-                ax = fig.add_subplot(1, len(self.camera_names), idx+1)
+                ax = fig.add_subplot(1, len(self.camera_names), idx + 1)
                 ax.imshow(rgb)
-                ax.imshow(mask, alpha=0.5,cmap='gray', vmin=0, vmax=255)
+                ax.imshow(mask, alpha=0.5, cmap="gray", vmin=0, vmax=255)
                 ax.set_title(cam)
                 # tight_layout会自动调整子图参数，使之填充整个图像区域
                 plt.tight_layout()
@@ -515,7 +543,6 @@ class VoxPoserPyRepQuadcopterEnv:
             data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
             plt.close(fig)
             self.visualizer.add_frame(data)
-            
 
     def _process_obs(self, obs):
         """

@@ -5,7 +5,7 @@ import copy
 import time
 from dynamics_models import PushingDynamicsModel
 
-from envs.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
+from envs.pyrep_env.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
 
 # creating some aliases for end effector and table in case LLMs refer to them differently
 EE_ALIAS = ["ee", "endeffector", "end_effector", "end effector", "gripper", "hand"]

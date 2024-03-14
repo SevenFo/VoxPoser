@@ -5,7 +5,7 @@ from pyrep.backend import sim, utils
 from pyrep.const import ObjectType
 
 
-class Quadcopter(Object):
+class PyRepQuadcopter(Object):
     def __init__(
         self,
         quadcopter_object_name="Quadricopter",

@@ -9,7 +9,7 @@ from visualizers import ValueMapVisualizer
 from utils import set_lmp_objects
 import numpy as np
 import engine_interfaces
-from envs.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
+from envs.pyrep_env.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
 from engine_interfaces import Dummy
 from VLMPipline.VLM import VLM
 
@@ -34,16 +34,23 @@ vlmpipeline = VLM(
     resnet_18_path,
     resnet_50_path,
     verbose=False,
-    resize_to=[320,320],
-    input_batch_size=5
+    resize_to=[320, 320],
+    input_batch_size=5,
 )
 
-visualizer = ValueMapVisualizer(config['visualizer'])
-env = VoxPoserPyRepQuadcopterEnv(visualizer=visualizer,headless=True,coppelia_scene_path=scene_path,vlmpipeline=vlmpipeline)
+visualizer = ValueMapVisualizer(config["visualizer"])
+env = VoxPoserPyRepQuadcopterEnv(
+    visualizer=visualizer,
+    headless=True,
+    coppelia_scene_path=scene_path,
+    vlmpipeline=vlmpipeline,
+)
 descriptions, obs = env.reset()
 dummy_engine = Dummy()
-lmps, lmp_env = setup_LMP(env, config, debug=False, engine_call_fn=dummy_engine.__call__)
-voxposer_ui = lmps['plan_ui']
+lmps, lmp_env = setup_LMP(
+    env, config, debug=False, engine_call_fn=dummy_engine.__call__
+)
+voxposer_ui = lmps["plan_ui"]
 set_lmp_objects(lmps, env.get_object_names())
 
 voxposer_ui(env.descriptions[-1])

@@ -16,7 +16,7 @@ import transforms3d
 from controllers import Controller, SimpleQuadcopterController
 import controllers
 
-from envs.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
+from envs.pyrep_env.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
 
 # creating some aliases for end effector and table in case LLMs refer to them differently (but rarely this happens)
 EE_ALIAS = [
@@ -30,7 +30,7 @@ EE_ALIAS = [
     "quadricopter",
     "UAV",
     "quadcopter",
-    "controlled object"
+    "controlled object",
 ]
 TABLE_ALIAS = [
     "table",
@@ -117,7 +117,9 @@ class LMP_interface:
             return [Observation(obs_dict)]
         else:
             obs_results = self._env.get_3d_obs_by_name_by_vlm(obj_name)
-            if obs_results is None: # actually if obs_results is None, it would raise an error in the get_3d_obs_by_name_by_vlm function
+            if (
+                obs_results is None
+            ):  # actually if obs_results is None, it would raise an error in the get_3d_obs_by_name_by_vlm function
                 return object_obs_list
             for id, obs_result in enumerate(obs_results):
                 obs_dict = dict()
@@ -139,7 +141,7 @@ class LMP_interface:
                 obs_dict["_point_cloud_world"] = obj_pc  # in world frame
                 obs_dict["normal"] = normalize_vector(obj_normal.mean(axis=0))
                 object_obs_list.append(Observation(obs_dict))
-        return object_obs_list 
+        return object_obs_list
 
     def execute_quad(
         self,
