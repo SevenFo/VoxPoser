@@ -1,0 +1,49 @@
+---
+AirSim:
+  SettingdVersion: 1
+  ClockSpeed: 3
+  SimpleFlight:
+    FirmwareName: SimpleFlight
+    RemoteControlID: 0
+    RC:
+      AllowAPIWhenDisconnected: true
+      AllowAPIAlways: true
+    ApiServerPort: 10000
+  CaptureSettings:
+  - ImageType: 0
+    Width: 480
+    Height: 480
+    FOV_Degrees: 90
+    AutoExposureSpeed: 1
+    AutoExposureBias: 0.5
+    AutoExposureMaxBrightness: 0.97
+    AutoExposureMinBrightness: 0.03
+    TargetGamma: 2.5
+  - ImageType: 1
+    Width: 480
+    Height: 480
+    FOV_Degrees: 90
+    AutoExposureSpeed: 1
+    AutoExposureBias: 0.5
+    AutoExposureMaxBrightness: 0.97
+    AutoExposureMinBrightness: 0.03
+    TargetGamma: 2.5
+  - ImageType: 5
+    Width: 480
+    Height: 480
+    FOV_Degrees: 90
+    AutoExposureSpeed: 1
+    AutoExposureBias: 0.5
+    AutoExposureMaxBrightness: 0.97
+    AutoExposureMinBrightness: 0.03
+    TargetGamma: 2.5
+DroneController:
+  start_height_offset: 0
+Environment:
+  airsim_settings_path: "~/Documents/AirSim/settings.json"
+  simulator_path: "~/Projects/DRIF/DroneSimLab/LinuxNoEditor/MyProject5.sh"
+  sim_config_dir: "/home/siky/unreal_config/"
+  config_dir: "/home/siky/Projects/DRIF/drif_workspace_corl2019"
+  templates: false
+  annotation_set: '7000'
+  headless: false

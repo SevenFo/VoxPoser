@@ -3,7 +3,7 @@ from pyvirtualdisplay import Display
 import torch
 import open3d as o3d
 
-from arguments import get_config, load_config
+from yaml_config_utils import get_config, load_config
 from interfaces import setup_LMP, LMP_interface
 from visualizers import ValueMapVisualizer
 from utils import set_lmp_objects
