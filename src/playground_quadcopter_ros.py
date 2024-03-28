@@ -15,8 +15,8 @@ from engine_interfaces import Dummy
 from VLMPipline.VLM import VLM
 
 torch.set_grad_enabled(False)
-disp = Display(visible=False, size=(1920, 1080))
-disp.start()
+# disp = Display(visible=False, size=(1920, 1080))
+# disp.start()
 # vlm config
 owlv2_model_path = "/models/google-owlv2-large-patch14-finetuned"
 owlv2_model_path = "/models/google-owlv2-base-patch16-ensemble"
@@ -30,17 +30,6 @@ config_path = "./src/configs/airsim_ros_quadcopter.yaml"
 scene_path = "./src/scene/quadcopter_tree_sofa_helicopter.ttt"
 scene_target_objects = ["quadcopter", "sofa", "tree", "helicopter", "table"]
 env_config = get_config(config_path=config_path)
-vlmpipeline = VLM(
-    owlv2_model_path,
-    sam_model_path,
-    xmem_model_path,
-    resnet_18_path,
-    resnet_50_path,
-    verbose=False,
-    resize_to=[480, 480],
-    verbose_frame_every=1,
-    input_batch_size=5,
-)
 # vlmpipeline = VLM(
 #     owlv2_model_path,
 #     sam_model_path,
@@ -48,10 +37,21 @@ vlmpipeline = VLM(
 #     resnet_18_path,
 #     resnet_50_path,
 #     verbose=False,
-#     resize_to=[640, 640],
+#     resize_to=[480, 480],
 #     verbose_frame_every=1,
 #     input_batch_size=5,
 # )
+vlmpipeline = VLM(
+    owlv2_model_path,
+    sam_model_path,
+    xmem_model_path,
+    resnet_18_path,
+    resnet_50_path,
+    verbose=False,
+    resize_to=[640, 640],
+    verbose_frame_every=1,
+    input_batch_size=5,
+)
 prefix ="/shared/codes/VoxPoser"
 
 # sparkv3_engine_config = load_config(os.path.join(prefix,"src/configs/sparkv3_config.yaml"))
@@ -77,17 +77,17 @@ engine_tgi_deepseek33 = getattr(engine_interfaces, tgi_config["type"])(
 )  # engine initialization
 
 visualizer = ValueMapVisualizer(env_config["visualizer"])
-env = VoxPoserPyRepQuadcopterEnv(
-    visualizer=visualizer,
-    headless=True,
-    coppelia_scene_path=scene_path,
-    vlmpipeline=vlmpipeline,
-    target_objects=scene_target_objects,
-)
-# env = VoxPoserROSDroneEnv(vlmpipeline=vlmpipeline, visualizer=visualizer)
+# env = VoxPoserPyRepQuadcopterEnv(
+#     visualizer=visualizer,
+#     headless=True,
+#     coppelia_scene_path=scene_path,
+#     vlmpipeline=vlmpipeline,
+#     target_objects=scene_target_objects,
+# )
+env = VoxPoserROSDroneEnv(vlmpipeline=vlmpipeline, visualizer=visualizer)
 descriptions, obs = env.reset()
-descriptions = "fly to the table, then fly to the tree, and at last fly to the sofa"
-# descriptions = "fly to the apple, then fly to the point where you started"
+# descriptions = "fly to the table, then fly to the tree, and at last fly to the sofa"
+descriptions = "fly to the apple, then fly to the point where you started"
 lmps, lmp_env = setup_LMP(
     env, env_config, debug=False, engine_call_fn=engine_tgi_deepseek33
 )
@@ -97,6 +97,6 @@ set_lmp_objects(lmps, env.get_object_names())
 voxposer_ui(descriptions)
 # except Exception as e:
     # print(f"{type(e)}: {e}")
-env._pyrep.stop()
-env._pyrep.shutdown()
-disp.stop()
+# env._pyrep.stop()
+# env._pyrep.shutdown()
+# disp.stop()

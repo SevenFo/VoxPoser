@@ -1,6 +1,8 @@
 .vscode
 **/__pycache__
 src/visualizations/
+visualizations/
+visualizations*.tar
 src/cache
 src/achieves/
 src/configs/secret
@@ -14,3 +16,6 @@ src/pretrained_models/
 .download.json
 src/dummy_engine_test.ipynb
 deepseek-coder-6.7b-instruct/
+src/CMakeLists.txt
+build/
+devel/

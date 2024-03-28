@@ -99,6 +99,9 @@ class PathPlanner:
         print(
             f"[planners.py | {get_clock_time(milliseconds=True)}] after postprocessing, path length: {len(processed_path)}"
         )
+        # show all paths for debugging
+        for i in range(0, len(processed_path)):
+            print(f"[planners.py | {get_clock_time(milliseconds=True)}] {processed_path[i]}")
         print(
             f"[planners.py | {get_clock_time(milliseconds=True)}] last waypoint: {processed_path[-1]}"
         )
@@ -210,5 +213,11 @@ class PathPlanner:
         if object_centric:
             k = self.config["pushing_skip_per_k"]
             path = np.concatenate([path[k:-1:k], path[-1:]])
+        # skip waypoints to reduce path length
+        skip_ratio = None
+        if skip_ratio is not None:
+            path = path[::skip_ratio]
+            if len(path) % skip_ratio != 1:
+                path = np.append(path, path[-1])
         path = path.clip(0, self.map_size - 1)
         return path

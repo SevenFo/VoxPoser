@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Callable
 from LMP import LMP
 from utils import (
     get_clock_time,
@@ -13,10 +13,11 @@ from planners import PathPlanner
 import time
 from scipy.ndimage import distance_transform_edt
 import transforms3d
-from controllers import Controller, SimpleQuadcopterController
+from controllers import Controller, SimpleQuadcopterController, SimpleROSController
 import controllers
 
 from envs.pyrep_env.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
+from envs.ros_env.ros_env import VoxPoserROSDroneEnv
 
 # creating some aliases for end effector and table in case LLMs refer to them differently (but rarely this happens)
 EE_ALIAS = [
@@ -47,7 +48,7 @@ TABLE_ALIAS = [
 class LMP_interface:
     def __init__(
         self,
-        env: VoxPoserPyRepQuadcopterEnv,
+        env: Union[VoxPoserPyRepQuadcopterEnv,VoxPoserROSDroneEnv],
         lmp_config,
         controller_config,
         planner_config,
@@ -61,6 +62,8 @@ class LMP_interface:
         _controller_type = controller_config["type"]
         if _controller_type == "SimpleQuadcopterController":
             self._controller = SimpleQuadcopterController(self._env, controller_config)
+        elif _controller_type == "SimpleROSController":
+            self._controller = SimpleROSController(self._env, controller_config)
         else:
             self._controller = Controller(self._env, controller_config)
         self.is_quad_env = True
@@ -106,7 +109,7 @@ class LMP_interface:
         assert self._env.vlm is not None, "please enable VLM before calling detect_quad"
         object_obs_list = []
         # enable_vlm = False
-        print(f"calling detect VLM enable: {True}")
+        print(f"[interface.py] calling VLM to detect {obj_name}")
         if obj_name.lower() in EE_ALIAS:
             # 如果是执行器则不需要调用模型进行检测
             obs_dict = dict()
@@ -145,12 +148,12 @@ class LMP_interface:
 
     def execute_quad(
         self,
-        movable_obs_func,
-        affordance_map=None,
-        avoidance_map=None,
-        velocity_map=None,
-        rotation_map=None,
-        gripper_map=None,
+        movable_obs_func:Callable,
+        affordance_map:Callable = None,
+        avoidance_map:Callable = None,
+        velocity_map:Callable = None,
+        rotation_map:Callable = None,
+        gripper_map:Callable = None,
     ):
         """
         First use planner to generate waypoint path, then use controller to follow the waypoints.
@@ -163,7 +166,7 @@ class LMP_interface:
           velocity_map: callable function that generates a 3D numpy array, the velocity voxel map
           gripper_map: callable function that generates a 3D numpy array, the gripper voxel map, not used for quadricopter
         """
-        print("calling execute")
+        print("[interface.py] calling execute")
         assert gripper_map is None, "gripper_map is not used for quadricopter"
         assert (
             rotation_map is None
@@ -173,22 +176,25 @@ class LMP_interface:
             velocity_map = self._get_default_voxel_map("velocity")
         if avoidance_map is None:
             avoidance_map = self._get_default_voxel_map("obstacle")
-        object_centric = not movable_obs_func()["name"] in EE_ALIAS
+            
+        object_centric = not movable_obs_func()["name"] in EE_ALIAS # false as the object is the quadricopter
         assert not object_centric, "the movable object must be the quadricopter"
         execute_info = []
         if affordance_map is not None:
             # execute path in closed-loop
-            print(f"max plan iter: {self._cfg['max_plan_iter']}")
+            print(f"[interface.py] max plan iter: {self._cfg['max_plan_iter']}")
             for plan_iter in range(self._cfg["max_plan_iter"]):
                 step_info = dict()
                 # evaluate voxel maps such that we use latest information
+                # 即：假设在execute的时候环境已经发生了变化，那么这里就会重新计算一次voxel map
+                # 在执行路径的时候，不会对voxel map进行修改，也就是说不会调用detect函数来检测物体
                 movable_obs = movable_obs_func()
                 _affordance_map = affordance_map()
-                _avoidance_map = avoidance_map()
+                _pre_avoidance_map = avoidance_map()
                 _velocity_map = velocity_map()
                 # TODO preprocess avoidance map, havent implemented yet
                 _avoidance_map = self._preprocess_avoidance_map(
-                    _avoidance_map, _affordance_map, movable_obs
+                    _pre_avoidance_map, _affordance_map, movable_obs
                 )
                 # start planning
                 start_pos = movable_obs["position"]
@@ -227,6 +233,7 @@ class LMP_interface:
                     gripper_map() if gripper_map is not None else None
                 )
                 step_info["avoidance_map"] = _avoidance_map
+                step_info['pre_avoidance_map'] = _pre_avoidance_map
 
                 # visualize
                 if self._cfg["visualize"]:
@@ -528,31 +535,32 @@ class LMP_interface:
 
     def _preprocess_avoidance_map(self, avoidance_map, affordance_map, movable_obs):
         # # collision avoidance
-        # scene_collision_map = self._get_scene_collision_voxel_map()
-        # # anywhere within 15/100 indices of the target is ignored (to guarantee that we can reach the target)
-        # ignore_mask = distance_transform_edt(1 - affordance_map)
-        # scene_collision_map[ignore_mask < int(0.15 * self._map_size)] = 0
-        # # anywhere within 15/100 indices of the start is ignored
-        # try:
-        #     ignore_mask = distance_transform_edt(1 - movable_obs["occupancy_map"])
-        #     scene_collision_map[ignore_mask < int(0.15 * self._map_size)] = 0
-        # except KeyError:
-        #     start_pos = movable_obs["position"]
-        #     ignore_mask = np.ones_like(avoidance_map)
-        #     ignore_mask[
-        #         start_pos[0]
-        #         - int(0.1 * self._map_size) : start_pos[0]
-        #         + int(0.1 * self._map_size),
-        #         start_pos[1]
-        #         - int(0.1 * self._map_size) : start_pos[1]
-        #         + int(0.1 * self._map_size),
-        #         start_pos[2]
-        #         - int(0.1 * self._map_size) : start_pos[2]
-        #         + int(0.1 * self._map_size),
-        #     ] = 0
-        #     scene_collision_map *= ignore_mask
-        # avoidance_map += scene_collision_map
-        # avoidance_map = np.clip(avoidance_map, 0, 1)
+        scene_collision_map = self._get_scene_collision_voxel_map()
+        # anywhere within 10/100 indices of the target is ignored (to guarantee that we can reach the target)
+        ignore_mask = distance_transform_edt(1 - affordance_map)
+        scene_collision_map[ignore_mask < int(0.10 * self._map_size)] = 0
+        # anywhere within 10/100 indices of the start is ignored, maybe can prevent the drone from being stuck
+        try:
+            # should arise KeyError if the object is the quadricopter
+            ignore_mask = distance_transform_edt(1 - movable_obs["occupancy_map"])
+            scene_collision_map[ignore_mask < int(0.10 * self._map_size)] = 0
+        except KeyError:
+            start_pos = movable_obs["position"]
+            ignore_mask = np.ones_like(avoidance_map)
+            ignore_mask[
+                start_pos[0]
+                - int(0.1 * self._map_size) : start_pos[0]
+                + int(0.1 * self._map_size),
+                start_pos[1]
+                - int(0.1 * self._map_size) : start_pos[1]
+                + int(0.1 * self._map_size),
+                start_pos[2]
+                - int(0.1 * self._map_size) : start_pos[2]
+                + int(0.1 * self._map_size),
+            ] = 0
+            scene_collision_map *= ignore_mask
+        avoidance_map += scene_collision_map
+        avoidance_map = np.clip(avoidance_map, 0, 1)
         return avoidance_map
 
 

@@ -1,0 +1,147 @@
+env_name: airsim_ros_quadcopter
+
+planner:
+  stop_threshold: 0.001
+  savgol_polyorder: 3
+  savgol_window_size: 20
+  obstacle_map_weight: 1
+  max_steps: 300
+  obstacle_map_gaussian_sigma: 10
+  target_map_weight: 2
+  stop_criteria: no_nearby_equal
+  target_spacing: 1
+  max_curvature: 3
+  pushing_skip_per_k: 5
+
+controller:
+  type: SimpleROSController
+  horizon_length: 1
+  num_samples: 10000
+  ee_local: temperature
+  e4_local_radius: 0.15
+  mode: velocity
+
+visualizer:
+  save_dir: ./visualizations
+  quality: low
+  map_size: 100
+
+lmp_config:
+  env:
+    map_size: 100
+    num_waypoints_per_plan: 10000  # set to a large number since we only do open loop for sim
+    max_plan_iter: 1
+    visualize: True
+  lmps:
+    planner:
+      prompt_fname: real_planner_prompt
+      model: Dummy
+      max_tokens: 512
+      temperature: 0.3
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects = '
+        - '# done'
+      maintain_session: False
+      include_context: True
+      has_return: False
+      return_val_name: ret_val
+      load_cache: True
+    composer:
+      prompt_fname: real_composer_prompt
+      model: Dummy
+      max_tokens: 512
+      temperature: 0.3
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: False
+      include_context: False
+      has_return: False
+      return_val_name: ret_val
+      load_cache: True
+    parse_query_obj:
+      prompt_fname: real_parse_query_obj_prompt
+      model: Dummy
+      max_tokens: 512
+      temperature: 0.3
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: False
+      include_context: True
+      has_return: True
+      return_val_name: ret_val
+      load_cache: True
+    get_affordance_map:
+      prompt_fname: real_get_affordance_map_prompt_2048
+      model: Dummy
+      max_tokens: 512
+      temperature: 0.3
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: False
+      include_context: False
+      has_return: True
+      return_val_name: ret_val
+      load_cache: True
+    get_avoidance_map:
+      prompt_fname: real_get_avoidance_map_prompt
+      model: Dummy
+      max_tokens: 512
+      temperature: 0.3
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: False
+      include_context: False
+      has_return: True
+      return_val_name: ret_val
+      load_cache: True
+    get_velocity_map:
+      prompt_fname: real_get_velocity_map_prompt
+      model: Dummy
+      max_tokens: 512
+      temperature: 0.3
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: False
+      include_context: False
+      has_return: True
+      return_val_name: ret_val
+      load_cache: True
+    # get_rotation_map:
+    #   prompt_fname: real_get_rotation_map_prompt
+    #   model: Dummy
+    #   max_tokens: 512
+    #   temperature: 0.3
+    #   query_prefix: '# Query: '
+    #   query_suffix: '.'
+    #   stop:
+    #     - '# Query: '
+    #     - 'objects =        
+    #     - '# done'
+    #   maintain_session: False
+    #   include_context: False
+    #   has_return: True
+    #   return_val_name: ret_val
+    #   load_cache: True

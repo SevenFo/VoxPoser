@@ -94,7 +94,7 @@ class LMP:
 
     def __call__(self, query, **kwargs):
         calling_level = len(inspect.getouterframes(inspect.currentframe())) // 3
-        print("calling level:", calling_level)
+        print(f"[LMP.py | {self._name}] calling level:", calling_level)
 
         prompt, user_query, splited_prompt = self.build_prompt(query)
 

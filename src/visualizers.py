@@ -21,7 +21,8 @@ class ValueMapVisualizer:
         self.update_quality(self.quality)
         self.map_size = config["map_size"]
         self.objects_points = []
-        self.masks = []
+        self.masks = {}
+        self.rgb = {}
         self.frames = []
 
     def update_bounds(self, lower, upper):
@@ -101,8 +102,21 @@ class ValueMapVisualizer:
     def update_depth_map(self, depth_map):
         self.depth_map = depth_map
 
-    def add_mask(self, mask):
-        self.masks.append(mask)
+    def add_mask(self, cam_name, mask):
+        if cam_name not in self.masks.keys():
+            self.masks.update({
+                f"{cam_name}": [mask]
+            })
+            return
+        self.masks[cam_name].append(mask)
+    
+    def add_rgb(self, cam_name, rgb):
+        if cam_name not in self.rgb.keys():
+            self.rgb.update({
+                f"{cam_name}": [rgb]
+            })
+            return
+        self.rgb[cam_name].append(rgb)
 
     def add_frame(self, frame):
         self.frames.append(frame)
@@ -119,17 +133,67 @@ class ValueMapVisualizer:
                 fps=10
             )
         if len(self.masks) > 0:
-            save_path = os.path.join(self.save_dir, log_id + "-masks.gif")
-            print(f"** saving masks gif to {save_path}")
-            iio.imwrite(
-                save_path,
-                np.stack(self.masks, axis=0),
-                fps=10
-            )
+            for key, value in self.masks.items():
+                save_path = os.path.join(self.save_dir, log_id + f"-{key}-masks.gif")
+                print(f"** saving masks gif {key} to {save_path}")
+                iio.imwrite(
+                    save_path,
+                    np.stack(value, axis=0),
+                    fps=10
+                )
+        if len(self.rgb) > 0:
+            for key, value in self.rgb.items():
+                save_path = os.path.join(self.save_dir, log_id + f"-{key}-rgb.gif")
+                print(f"** saving rgb gif {key} to {save_path}")
+                iio.imwrite(
+                    save_path,
+                    np.stack(value, axis=0),
+                    fps=10
+                )
         print("** saved to", self.save_dir)
-        self.masks = []
+        self.masks = {}
         self.frames = []
-
+        self.rgb = {}
+    
+    def _add_voxel_map(self, map, name, fig_data):
+        skip_ratio = (self.workspace_bounds_max - self.workspace_bounds_min) / (
+            self.map_size / self.downsample_ratio
+        )
+        # Generate the grid points, mgrid is similar to meshgrid, which takes the start, end, and step size for each dimension
+        x, y, z = np.mgrid[
+            self.workspace_bounds_min[0] : self.workspace_bounds_max[
+                0
+            ] : skip_ratio[0],
+            self.workspace_bounds_min[1] : self.workspace_bounds_max[
+                1
+            ] : skip_ratio[1],
+            self.workspace_bounds_min[2] : self.workspace_bounds_max[
+                2
+            ] : skip_ratio[2],
+        ]
+        grid_shape = map.shape
+        # Trim the grid points to match the costmap shape
+        x = x[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
+        y = y[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
+        z = z[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
+        # Add the costmap as a volume plot
+        fig_data.append(
+            go.Volume(
+                x=x.flatten(),
+                y=y.flatten(),
+                z=z.flatten(),
+                value=map.flatten(),
+                isomin=0,
+                isomax=1,
+                opacity=self.costmap_opacity,
+                surface_count=self.costmap_surface_count,
+                colorscale="Jet",
+                showlegend=True,
+                showscale=False,
+                name=name,
+            )
+        )
+    
     def visualize(self, info, show=False, save=True):
         """
         Visualize the path and relevant info using plotly.
@@ -183,44 +247,7 @@ class ValueMapVisualizer:
                     :: self.downsample_ratio,
                     :: self.downsample_ratio,
                 ]
-                # Calculate the skip ratio for grid points
-                skip_ratio = (self.workspace_bounds_max - self.workspace_bounds_min) / (
-                    self.map_size / self.downsample_ratio
-                )
-                # Generate the grid points, mgrid is similar to meshgrid, which takes the start, end, and step size for each dimension
-                x, y, z = np.mgrid[
-                    self.workspace_bounds_min[0] : self.workspace_bounds_max[
-                        0
-                    ] : skip_ratio[0],
-                    self.workspace_bounds_min[1] : self.workspace_bounds_max[
-                        1
-                    ] : skip_ratio[1],
-                    self.workspace_bounds_min[2] : self.workspace_bounds_max[
-                        2
-                    ] : skip_ratio[2],
-                ]
-                grid_shape = costmap.shape
-                # Trim the grid points to match the costmap shape
-                x = x[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
-                y = y[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
-                z = z[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
-                # Add the costmap as a volume plot
-                fig_data.append(
-                    go.Volume(
-                        x=x.flatten(),
-                        y=y.flatten(),
-                        z=z.flatten(),
-                        value=costmap.flatten(),
-                        isomin=0,
-                        isomax=1,
-                        opacity=self.costmap_opacity,
-                        surface_count=self.costmap_surface_count,
-                        colorscale="Jet",
-                        showlegend=True,
-                        showscale=False,
-                        name="costmap",
-                    )
-                )
+                self._add_voxel_map(costmap, "costmap", fig_data)
             if "affordance_map" in info:
                 # Downsample the costmap, :: means sample points every downsample_ratio
                 affordance_map = info["affordance_map"][
@@ -228,44 +255,23 @@ class ValueMapVisualizer:
                     :: self.downsample_ratio,
                     :: self.downsample_ratio,
                 ]
-                # Calculate the skip ratio for grid points
-                skip_ratio = (self.workspace_bounds_max - self.workspace_bounds_min) / (
-                    self.map_size / self.downsample_ratio
-                )
-                # Generate the grid points, mgrid is similar to meshgrid, which takes the start, end, and step size for each dimension
-                x, y, z = np.mgrid[
-                    self.workspace_bounds_min[0] : self.workspace_bounds_max[
-                        0
-                    ] : skip_ratio[0],
-                    self.workspace_bounds_min[1] : self.workspace_bounds_max[
-                        1
-                    ] : skip_ratio[1],
-                    self.workspace_bounds_min[2] : self.workspace_bounds_max[
-                        2
-                    ] : skip_ratio[2],
+                self._add_voxel_map(affordance_map, "affordance_map", fig_data)
+            if "avoidance_map" in info:
+                # Downsample the costmap, :: means sample points every downsample_ratio
+                avoidance_map = info["avoidance_map"][
+                    :: self.downsample_ratio,
+                    :: self.downsample_ratio,
+                    :: self.downsample_ratio,
                 ]
-                grid_shape = affordance_map.shape
-                # Trim the grid points to match the affordance_map shape
-                x = x[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
-                y = y[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
-                z = z[: grid_shape[0], : grid_shape[1], : grid_shape[2]]
-                # Add the affordance_map as a volume plot
-                fig_data.append(
-                    go.Volume(
-                        x=x.flatten(),
-                        y=y.flatten(),
-                        z=z.flatten(),
-                        value=affordance_map.flatten(),
-                        isomin=0,
-                        isomax=1,
-                        opacity=self.costmap_opacity,
-                        surface_count=self.costmap_surface_count,
-                        colorscale="Jet",
-                        showlegend=True,
-                        showscale=True,
-                        name="affordance_map",
-                    )
-                )
+                self._add_voxel_map(avoidance_map, "avoidance_map", fig_data)
+            if "pre_avoidance_map" in info:
+                # Downsample the costmap, :: means sample points every downsample_ratio
+                pre_avoidance_map = info["pre_avoidance_map"][
+                    :: self.downsample_ratio,
+                    :: self.downsample_ratio,
+                    :: self.downsample_ratio,
+                ]
+                self._add_voxel_map(pre_avoidance_map, "pre_avoidance_map", fig_data)
             # plot start position
             if "start_pos" in planner_info:
                 fig_data.append(

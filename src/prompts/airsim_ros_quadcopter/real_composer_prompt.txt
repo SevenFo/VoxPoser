@@ -1,0 +1,31 @@
+import numpy as np
+from env_utils import execute, reset_to_default_pose, index2cm
+from perception_utils import parse_query_obj
+from plan_utils import get_affordance_map, get_avoidance_map, get_velocity_map
+
+# Query: move to 10cm above the table.
+movable = parse_query_obj('quadcopter')
+affordance_map = get_affordance_map('a point 10cm above the table')
+execute(movable, affordance_map=affordance_map)
+# done
+
+# Query: move to 10cm above the yellow block while keeping at least 30cm away from the mug.
+movable = parse_query_obj('quadcopter')
+affordance_map = get_affordance_map('a point 10cm above the yellow block')
+avoidance_map = get_avoidance_map('30cm near the mug')
+execute(movable, affordance_map=affordance_map, avoidance_map=get_avoidance_map)
+# done
+
+# Query: move to {a precise point}.
+movable = parse_query_obj('quadcopter')
+affordance_map = get_affordance_map(f'a point at {a precise point}')
+execute(movable, affordance_map=affordance_map)
+# done
+
+# Query: move along a circular path above the tank, ensuring that the diameter of the path is tangent to the diameter of the tank's rim.
+movable = parse_query_obj('quadcopter')
+tank = parse_query_obj('tank')
+(min_x, min_y, min_z), (max_x, max_y, max_z) = tank.aabb
+diameter = np.min([max_x-min_x, max_y-min_y])
+affordance_map = get_affordance_map(f'a circle above the tank 30cm with a radius of {index2cm(diameter)}cm')
+# done
