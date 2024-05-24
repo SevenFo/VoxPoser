@@ -19,3 +19,4 @@ deepseek-coder-6.7b-instruct/
 src/CMakeLists.txt
 build/
 devel/
+*.mp4

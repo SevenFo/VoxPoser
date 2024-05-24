@@ -18,6 +18,7 @@ import controllers
 
 from envs.pyrep_env.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
 from envs.ros_env.ros_env import VoxPoserROSDroneEnv
+from envs.dummy_env import DummyEnv
 
 # creating some aliases for end effector and table in case LLMs refer to them differently (but rarely this happens)
 EE_ALIAS = [
@@ -48,7 +49,7 @@ TABLE_ALIAS = [
 class LMP_interface:
     def __init__(
         self,
-        env: Union[VoxPoserPyRepQuadcopterEnv,VoxPoserROSDroneEnv],
+        env: Union[VoxPoserPyRepQuadcopterEnv, VoxPoserROSDroneEnv, DummyEnv],
         lmp_config,
         controller_config,
         planner_config,
@@ -119,10 +120,17 @@ class LMP_interface:
             obs_dict["_position_world"] = self._env.get_ee_pos()
             return [Observation(obs_dict)]
         else:
+            if type(self._env) == DummyEnv:
+                return {
+                    "name": "dummy_object",
+                    "position": np.array([0, 0, 0]),
+                    "aabb": np.array([[0, 0, 0], [0, 0, 0]]),
+                    "_position_world": np.array([0, 0, 0]),
+                }
             obs_results = self._env.get_3d_obs_by_name_by_vlm(obj_name)
             if (
                 obs_results is None
-            ):  # actually if obs_results is None, it would raise an error in the get_3d_obs_by_name_by_vlm function
+            ):  # actually if obs_results is None, it would raise an error in the get_3d_obs_by_name_by_vlm function or make quadcopter to fly higher?
                 return object_obs_list
             for id, obs_result in enumerate(obs_results):
                 obs_dict = dict()
@@ -148,12 +156,12 @@ class LMP_interface:
 
     def execute_quad(
         self,
-        movable_obs_func:Callable,
-        affordance_map:Callable = None,
-        avoidance_map:Callable = None,
-        velocity_map:Callable = None,
-        rotation_map:Callable = None,
-        gripper_map:Callable = None,
+        movable_obs_func: Callable,
+        affordance_map: Callable = None,
+        avoidance_map: Callable = None,
+        velocity_map: Callable = None,
+        rotation_map: Callable = None,
+        gripper_map: Callable = None,
     ):
         """
         First use planner to generate waypoint path, then use controller to follow the waypoints.
@@ -176,8 +184,10 @@ class LMP_interface:
             velocity_map = self._get_default_voxel_map("velocity")
         if avoidance_map is None:
             avoidance_map = self._get_default_voxel_map("obstacle")
-            
-        object_centric = not movable_obs_func()["name"] in EE_ALIAS # false as the object is the quadricopter
+
+        object_centric = (
+            not movable_obs_func()["name"] in EE_ALIAS
+        )  # false as the object is the quadricopter
         assert not object_centric, "the movable object must be the quadricopter"
         execute_info = []
         if affordance_map is not None:
@@ -233,7 +243,7 @@ class LMP_interface:
                     gripper_map() if gripper_map is not None else None
                 )
                 step_info["avoidance_map"] = _avoidance_map
-                step_info['pre_avoidance_map'] = _pre_avoidance_map
+                step_info["pre_avoidance_map"] = _pre_avoidance_map
 
                 # visualize
                 if self._cfg["visualize"]:
@@ -548,14 +558,11 @@ class LMP_interface:
             start_pos = movable_obs["position"]
             ignore_mask = np.ones_like(avoidance_map)
             ignore_mask[
-                start_pos[0]
-                - int(0.1 * self._map_size) : start_pos[0]
+                start_pos[0] - int(0.1 * self._map_size) : start_pos[0]
                 + int(0.1 * self._map_size),
-                start_pos[1]
-                - int(0.1 * self._map_size) : start_pos[1]
+                start_pos[1] - int(0.1 * self._map_size) : start_pos[1]
                 + int(0.1 * self._map_size),
-                start_pos[2]
-                - int(0.1 * self._map_size) : start_pos[2]
+                start_pos[2] - int(0.1 * self._map_size) : start_pos[2]
                 + int(0.1 * self._map_size),
             ] = 0
             scene_collision_map *= ignore_mask

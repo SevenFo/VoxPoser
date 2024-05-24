@@ -7,6 +7,7 @@ from dynamics_models import PushingDynamicsModel
 
 from envs.pyrep_env.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
 from envs.ros_env.ros_env import VoxPoserROSDroneEnv
+from envs.dummy_env import DummyEnv
 
 # creating some aliases for end effector and table in case LLMs refer to them differently
 EE_ALIAS = ["ee", "endeffector", "end_effector", "end effector", "gripper", "hand"]
@@ -228,7 +229,7 @@ class Controller:
 class SimpleQuadcopterController:
     def __init__(self, env: VoxPoserPyRepQuadcopterEnv, config) -> None:
         assert (
-            type(env) == VoxPoserPyRepQuadcopterEnv
+            type(env) == VoxPoserPyRepQuadcopterEnv or type(env) == DummyEnv
         ), "env type should be VoxPoserPyRepQuadcopterEnv"
         self.env = env
 
@@ -262,6 +263,7 @@ class SimpleQuadcopterController:
             )
         return info
 
+
 class SimpleROSController:
     def __init__(self, env: VoxPoserROSDroneEnv, config) -> None:
         assert (
@@ -270,7 +272,7 @@ class SimpleROSController:
         self.env = env
         self.mode = config.mode
         print(f"[controllers.py] using mode: {self.mode}")
-        
+
     def execute(self, movable_obs, waypoint, is_object_centric=False):
         """
         execute a waypoint
@@ -304,7 +306,7 @@ class SimpleROSController:
                 "not implement execute when movable is not qudacopter"
             )
         return info
-    
+
     def _execute_velocity(self, movable_obs, target_xyz):
         """
         execute a waypoint
@@ -315,14 +317,14 @@ class SimpleROSController:
         :param waypoint: list, [target_xyz, target_rotation, target_velocity, target_gripper], target_xyz is for movable in world frame
         :return: None
         """
-        # use PI to control the drone: calculate the error between the target and the current position, 
+        # use PI to control the drone: calculate the error between the target and the current position,
         # then use PI to control the drone velocity in the x, y, z direction
         current_position = self.env.get_ee_pos()
         error = np.array(target_xyz) - np.array(current_position)
         # close loop control
         # PI controller
-        kp = 0.5
-        ki = 0.01
+        kp = 0.3
+        ki = 0.0001
         self.integral = np.zeros(3)
         print(
             f"[controllers.py] start PI control, current position: {current_position[0]:.3},{current_position[1]:.3},{current_position[2]:.3} \
@@ -342,5 +344,4 @@ velocity: {velocity[0]:.3},{velocity[1]:.3},{velocity[2]:.3}"
             result = self.env.apply_action(velocity, mode=self.mode)
             current_position = self.env.get_ee_pos()
             error = np.array(target_xyz) - np.array(current_position)
-        result = self.env.apply_action(np.array([0,0,0]), mode=self.mode) # stop
-
+        result = self.env.apply_action(np.array([0, 0, 0]), mode=self.mode)  # stop
