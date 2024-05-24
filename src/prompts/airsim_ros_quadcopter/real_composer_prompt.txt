@@ -9,6 +9,13 @@ affordance_map = get_affordance_map('a point 10cm above the table')
 execute(movable, affordance_map=affordance_map)
 # done
 
+# Query: move forward to 100cm from current position
+movable = parse_query_obj('quadcopter')
+current_position = movable.position # record current position
+affordance_map = get_affordance_map(f'a point 100cm in front of the {current_position}')
+execute(movable, affordance_map=affordance_map)
+# done
+
 # Query: move to 10cm above the yellow block while keeping at least 30cm away from the mug.
 movable = parse_query_obj('quadcopter')
 affordance_map = get_affordance_map('a point 10cm above the yellow block')

@@ -155,9 +155,9 @@ if tray_with_lemon is None:
     ret_val = affordance_map
 (min_x, min_y, min_z), (max_x, max_y, max_z) = tray_with_lemon.aabb
 center_x, center_y, center_z = tray_with_lemon.position
-# 4cm to the left of so we subtract from y-axis, and 10cm on top of so we add to z-axis
-x = center_x
-y = min_y - cm2index(4, 'y')
+# 4cm to the left of so we subtract from x-axis, and 10cm on top of so we add to z-axis
+x = center_x - cm2index(4, 'x')
+y = min_y 
 z = max_z + cm2index(10, 'z')
 affordance_map[x, y, z] = 1
 ret_val = affordance_map
@@ -165,9 +165,9 @@ ret_val = affordance_map
 
 # Query: a point 10cm to the right of [45 49 66], and 5cm above it.
 affordance_map = get_empty_affordance_map()
-# 10cm to the right of so we add to y-axis, and 5cm above it so we add to z-axis
-x = 45
-y = 49 + cm2index(10, 'y')
+# 10cm to the right of so we add to x-axis, and 5cm above it so we add to z-axis
+x = 45 + cm2index(10, 'x')
+y = 49 
 z = 66 + cm2index(5, 'z')
 affordance_map[x, y, z] = 1
 ret_val = affordance_map

@@ -43,18 +43,6 @@ affordance_map[x, y, z] = 1
 ret_val = affordance_map
 # done
 
-# Query: a point 20cm away from the leftmost block.
-affordance_map = get_empty_affordance_map()
-leftmost_block = parse_query_obj('leftmost block')
-if leftmost_block is None:
-    ret_val = affordance_map
-# positive normal because we are moving away from the block.
-moving_dir = leftmost_block.normal
-affordance_xyz = leftmost_block.position + cm2index(20, moving_dir)
-affordance_map[affordance_xyz[0], affordance_xyz[1], affordance_xyz[2]] = 1
-ret_val = affordance_map
-# done
-
 # Query: a point 4cm to the left of and 10cm on top of the tray that contains the lemon.
 affordance_map = get_empty_affordance_map()
 tray_with_lemon = parse_query_obj('tray that contains the lemon')
@@ -62,9 +50,9 @@ if tray_with_lemon is None:
     ret_val = affordance_map
 (min_x, min_y, min_z), (max_x, max_y, max_z) = tray_with_lemon.aabb
 center_x, center_y, center_z = tray_with_lemon.position
-# 4cm to the left of so we subtract from y-axis, and 10cm on top of so we add to z-axis
-x = center_x
-y = min_y - cm2index(4, 'y')
+# 4cm to the left of so we subtract from x-axis, and 10cm on top of so we add to z-axis
+x = min_x - cm2index(4, 'x')
+y = center_y 
 z = max_z + cm2index(10, 'z')
 affordance_map[x, y, z] = 1
 ret_val = affordance_map
@@ -73,8 +61,8 @@ ret_val = affordance_map
 # Query: a point 10cm to the right of [45 49 66], and 5cm above it.
 affordance_map = get_empty_affordance_map()
 # 10cm to the right of so we add to y-axis, and 5cm above it so we add to z-axis
-x = 45
-y = 49 + cm2index(10, 'y')
+x = 45 + cm2index(10, 'y')
+y = 49 
 z = 66 + cm2index(5, 'z')
 affordance_map[x, y, z] = 1
 ret_val = affordance_map
@@ -96,10 +84,34 @@ if yellow_bowl is None:
     ret_val = affordance_map
 (min_x, min_y, min_z), (max_x, max_y, max_z) = yellow_bowl.aabb
 center_x, center_y, center_z = yellow_bowl.position
-# 10cm above so we add to z-axis, and 5cm to the left of so we subtract from y-axis
-x = center_x
-y = min_y - cm2index(5, 'y')
+# 10cm above so we add to z-axis, and 5cm to the left of so we subtract from x-axis
+x = min_x - cm2index(5, 'x')
+y = center_y
 z = max_z + cm2index(10, 'z')
 affordance_map[x, y, z] = 1
 ret_val = affordance_map
 # done
+
+# Query: a point 88cm to the front of [10 20 50].
+affordance_map = get_empty_affordance_map()
+# 88cm to the front of [10 20 50] so we add to y-axis
+x = 10 
+y = 20 + cm2index(88, 'y')
+z = 50
+affordance_map[x, y, z] = 1
+ret_val = affordance_map
+# done
+
+# Query: a point 100cm in front of the current position.
+affordance_map = get_empty_affordance_map()
+current_object = parse_query_obj('quadcopter')
+center_x, center_y, center_z = current_object.position
+# a point 100cm in front of so we add to y-axis
+x = center_x 
+y = center_y + cm2index(100, 'y')
+z = center_z
+affordance_map[x, y, z] = 1
+ret_val = affordance_map
+# done
+
+
