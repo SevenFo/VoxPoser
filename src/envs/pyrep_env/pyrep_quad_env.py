@@ -106,9 +106,7 @@ class VoxPoserPyRepQuadcopterEnv:
 
         forward_vector = np.array([0, 0, 1])
         self.lookat_vectors = {}
-        self.camera_params = (
-            {}
-        )  # different camera has different params, key: camera name, value: params
+        self.camera_params = {}  # different camera has different params, key: camera name, value: params
         for cam_name in CAMERA_NAME_LIST:
             extrinsics = self._cameras[cam_name].get_matrix()
             lookat = extrinsics[:3, :3] @ forward_vector
@@ -232,7 +230,9 @@ class VoxPoserPyRepQuadcopterEnv:
             # which masks == [0,0,0,0,0,0,0,0,0] if category_label == 4
             warnings.warn(f"Object {query_name} not found in the scene")
             return None
-        object_instance_label = np.unique(np.mod(masks, self.category_multiplier))[
+        object_instance_label = np.unique(
+            np.mod(masks, self.category_multiplier)
+        )[
             1:
         ]  # remove the background # [1,2] which measn there are two instances of this object
         assert (
@@ -530,6 +530,8 @@ class VoxPoserPyRepQuadcopterEnv:
             for idx, cam in enumerate(self.camera_names):
                 rgb = getattr(self.latest_obs, f"{cam}_rgb")
                 mask = np.mod(self.latest_mask[cam], 256)  # avoid overflow for color
+                self.visualizer.add_mask(cam, mask)
+                self.visualizer.add_rgb(cam, rgb)
                 # create a subfigure for each rgb frame
                 ax = fig.add_subplot(1, len(self.camera_names), idx + 1)
                 ax.imshow(rgb)
