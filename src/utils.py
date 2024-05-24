@@ -43,8 +43,11 @@ def load_prompt(prompt_fname):
     else:
         full_path = os.path.join(curr_dir, "prompts", prompt_fname)
     # read file
-    with open(full_path, "r") as f:
-        contents = f.read().strip()
+    try:
+        with open(full_path, "r", encoding='utf-8') as f:
+            contents = f.read().strip()
+    except UnicodeDecodeError as e:
+        print(f"UnicodeDecodeError in {full_path}: {e}")
     return contents
 
 
@@ -139,6 +142,7 @@ class DynamicObservation:
 
     def __get__(self, key):
         evaluated = self.func()
+        # print(evaluated,key)
         if isinstance(evaluated[key], np.ndarray):
             return evaluated[key].copy()
         return evaluated[key]
