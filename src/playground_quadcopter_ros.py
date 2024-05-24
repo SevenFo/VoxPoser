@@ -1,5 +1,4 @@
 from pyvirtualdisplay import Display
-from pyvirtualdisplay import Display
 import torch,os
 import open3d as o3d
 
@@ -87,7 +86,8 @@ visualizer = ValueMapVisualizer(env_config["visualizer"])
 env = VoxPoserROSDroneEnv(vlmpipeline=vlmpipeline, visualizer=visualizer)
 descriptions, obs = env.reset()
 # descriptions = "fly to the table, then fly to the tree, and at last fly to the sofa"
-descriptions = "fly to the apple, then fly to the point where you started"
+# descriptions = "fly to the house, then fly to the point where you started" # checked
+descriptions = "fly forward 100cm, then fly to the Stone lion statue, and at last fly backward 300cm" # underchecking
 lmps, lmp_env = setup_LMP(
     env, env_config, debug=False, engine_call_fn=engine_tgi_deepseek33
 )
