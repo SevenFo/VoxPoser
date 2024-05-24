@@ -18,15 +18,15 @@ torch.set_grad_enabled(False)
 disp = Display(visible=False, size=(1920, 1080))
 disp.start()
 # vlm config
-owlv2_model_path = "/models/google-owlv2-large-patch14-finetuned"
-owlv2_model_path = "/models/google-owlv2-base-patch16-ensemble"
-sam_model_path = "/models/facebook-sam-vit-huge"
-# sam_model_path = "/models/facebook-sam-vit-base"
-xmem_model_path = "/models/XMem.pth"
-resnet_18_path = "/models/resnet18.pth"
-resnet_50_path = "/models/resnet50.pth"
+owlv2_model_path = os.path.expanduser("~/models/google-owlv2-large-patch14-finetuned")
+owlv2_model_path = os.path.expanduser("~/models/google-owlv2-base-patch16-ensemble")
+sam_model_path = os.path.expanduser("~/models/facebook-sam-vit-huge")
+# sam_model_path = os.path.expanduser("~/models/facebook-sam-vit-base")
+xmem_model_path = os.path.expanduser("~/models/XMem.pth")
+resnet_18_path = os.path.expanduser("~/models/resnet18.pth")
+resnet_50_path = os.path.expanduser("~/models/resnet50.pth")
 config_path = "./src/configs/pyrep_quadcopter.yaml"
-config_path = "./src/configs/airsim_ros_quadcopter.yaml"
+# config_path = "./src/configs/airsim_ros_quadcopter.yaml"
 scene_path = "./src/scene/quadcopter_tree_sofa_helicopter.ttt"
 scene_target_objects = ["quadcopter", "sofa", "tree", "helicopter", "table"]
 env_config = get_config(config_path=config_path)
