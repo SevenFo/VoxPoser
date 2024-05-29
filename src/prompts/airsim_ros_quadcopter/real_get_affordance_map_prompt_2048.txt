@@ -60,8 +60,8 @@ ret_val = affordance_map
 
 # Query: a point 10cm to the right of [45 49 66], and 5cm above it.
 affordance_map = get_empty_affordance_map()
-# 10cm to the right of so we add to y-axis, and 5cm above it so we add to z-axis
-x = 45 + cm2index(10, 'y')
+# 10cm to the right of so we add to x-axis, and 5cm above it so we add to z-axis
+x = 45 + cm2index(10, 'x')
 y = 49 
 z = 66 + cm2index(5, 'z')
 affordance_map[x, y, z] = 1
