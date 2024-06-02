@@ -1,4 +1,5 @@
 """Plotly-Based Visualizer"""
+
 import plotly.graph_objects as go
 import imageio.v3 as iio
 from plotly.subplots import make_subplots
@@ -14,6 +15,7 @@ class ValueMapVisualizer:
 
     def __init__(self, config):
         self.scene_points = None
+        self.scene_points_filted = None
         self.save_dir = config["save_dir"]
         if self.save_dir is not None:
             os.makedirs(self.save_dir, exist_ok=True)
@@ -81,17 +83,53 @@ class ValueMapVisualizer:
                 f"Unknown quality: {self.quality}; should be one of [low, medium, high]"
             )
 
-    def update_scene_points(self, points, colors=None):
+    def update_scene_points(self, points: np.array, colors=None):
         minx, miny, minz = self.workspace_bounds_min
         maxx, maxy, maxz = self.workspace_bounds_max
-        mask = np.stack([points[:,0] < minx+0.1, points[:,0] > maxx-0.1, points[:,1] < miny+0.1, points[:,1]> maxy-0.1, points[:,2] < minz+0.1, points[:,2] > maxz-0.1], axis=1)
+        mask = np.stack(
+            [
+                points[:, 0] < minx + 0.1,
+                points[:, 0] > maxx - 0.1,
+                points[:, 1] < miny + 0.1,
+                points[:, 1] > maxy - 0.1,
+                points[:, 2] < minz + 0.1,
+                points[:, 2] > maxz - 0.1,
+            ],
+            axis=1,
+        )
         mask = np.logical_not(np.any(mask, axis=1))
-        points = points[mask,:]
+        points = points[mask, :]
         points = points.astype(np.float16)
         if colors is None:
-            colors = np.zeros((points.shape[0], 3), dtype=np.uint8) # default color is black
+            colors = np.zeros(
+                (points.shape[0], 3), dtype=np.uint8
+            )  # default color is black
         assert colors.dtype == np.uint8
         self.scene_points = (points, colors)
+
+    def update_scene_points_filted(self, points: np.array, colors=None):
+        minx, miny, minz = self.workspace_bounds_min
+        maxx, maxy, maxz = self.workspace_bounds_max
+        mask = np.stack(
+            [
+                points[:, 0] < minx + 0.1,
+                points[:, 0] > maxx - 0.1,
+                points[:, 1] < miny + 0.1,
+                points[:, 1] > maxy - 0.1,
+                points[:, 2] < minz + 0.1,
+                points[:, 2] > maxz - 0.1,
+            ],
+            axis=1,
+        )
+        mask = np.logical_not(np.any(mask, axis=1))
+        points = points[mask, :]
+        points = points.astype(np.float16)
+        if colors is None:
+            colors = np.zeros(
+                (points.shape[0], 3), dtype=np.uint8
+            )  # default color is black
+        assert colors.dtype == np.uint8
+        self.scene_points_filted = (points, colors)
 
     def add_object_points(self, points, label):
         added_labels = [l for _, l in self.objects_points]
@@ -104,17 +142,13 @@ class ValueMapVisualizer:
 
     def add_mask(self, cam_name, mask):
         if cam_name not in self.masks.keys():
-            self.masks.update({
-                f"{cam_name}": [mask]
-            })
+            self.masks.update({f"{cam_name}": [mask]})
             return
         self.masks[cam_name].append(mask)
-    
+
     def add_rgb(self, cam_name, rgb):
         if cam_name not in self.rgb.keys():
-            self.rgb.update({
-                f"{cam_name}": [rgb]
-            })
+            self.rgb.update({f"{cam_name}": [rgb]})
             return
         self.rgb[cam_name].append(rgb)
 
@@ -127,49 +161,31 @@ class ValueMapVisualizer:
         if len(self.frames) > 0:
             save_path = os.path.join(self.save_dir, log_id + "-frames.gif")
             print(f"** saving frames gif to {save_path}")
-            iio.imwrite(
-                save_path,
-                np.stack(self.frames, axis=0),
-                fps=10
-            )
+            iio.imwrite(save_path, np.stack(self.frames, axis=0), fps=10)
         if len(self.masks) > 0:
             for key, value in self.masks.items():
                 save_path = os.path.join(self.save_dir, log_id + f"-{key}-masks.gif")
                 print(f"** saving masks gif {key} to {save_path}")
-                iio.imwrite(
-                    save_path,
-                    np.stack(value, axis=0),
-                    fps=10
-                )
+                iio.imwrite(save_path, np.stack(value, axis=0), fps=10)
         if len(self.rgb) > 0:
             for key, value in self.rgb.items():
                 save_path = os.path.join(self.save_dir, log_id + f"-{key}-rgb.gif")
                 print(f"** saving rgb gif {key} to {save_path}")
-                iio.imwrite(
-                    save_path,
-                    np.stack(value, axis=0),
-                    fps=10
-                )
+                iio.imwrite(save_path, np.stack(value, axis=0), fps=10)
         print("** saved to", self.save_dir)
         self.masks = {}
         self.frames = []
         self.rgb = {}
-    
+
     def _add_voxel_map(self, map, name, fig_data):
         skip_ratio = (self.workspace_bounds_max - self.workspace_bounds_min) / (
             self.map_size / self.downsample_ratio
         )
         # Generate the grid points, mgrid is similar to meshgrid, which takes the start, end, and step size for each dimension
         x, y, z = np.mgrid[
-            self.workspace_bounds_min[0] : self.workspace_bounds_max[
-                0
-            ] : skip_ratio[0],
-            self.workspace_bounds_min[1] : self.workspace_bounds_max[
-                1
-            ] : skip_ratio[1],
-            self.workspace_bounds_min[2] : self.workspace_bounds_max[
-                2
-            ] : skip_ratio[2],
+            self.workspace_bounds_min[0] : self.workspace_bounds_max[0] : skip_ratio[0],
+            self.workspace_bounds_min[1] : self.workspace_bounds_max[1] : skip_ratio[1],
+            self.workspace_bounds_min[2] : self.workspace_bounds_max[2] : skip_ratio[2],
         ]
         grid_shape = map.shape
         # Trim the grid points to match the costmap shape
@@ -193,7 +209,7 @@ class ValueMapVisualizer:
                 name=name,
             )
         )
-    
+
     def visualize(self, info, show=False, save=True):
         """
         Visualize the path and relevant info using plotly.
@@ -325,25 +341,25 @@ class ValueMapVisualizer:
                     y=scene_points[:, 1],
                     z=scene_points[:, 2],
                     mode="markers",
+                    name="scene points",
                     marker=dict(size=3, color=scene_point_colors, opacity=1.0),
                 )
             )
-
 
         fig = make_subplots(
             rows=2,
             cols=2,
             specs=[
-                [{"type": "scene", "rowspan": 2}, {"type": "scene"}],
+                [{"type": "scene", "rowspan": 1}, {"type": "scene"}],
                 [
-                    None,
+                    {"type": "scene"},
                     {"type": "xy"},
                 ],
             ],
             subplot_titles=[
                 "display",
                 "objects cloudpoints",
-                None,
+                "scene_points_filtered",
                 "mask and depth map",
             ],
         )
@@ -352,34 +368,68 @@ class ValueMapVisualizer:
 
         # set bounds and ratio
         fig.update_scenes(
-                xaxis=dict(
-                    range=[self.plot_bounds_min[0], self.plot_bounds_max[0]],
-                    autorange=False,
-                ),
-                yaxis=dict(
-                    range=[self.plot_bounds_min[1], self.plot_bounds_max[1]],
-                    autorange=False,
-                ),
-                zaxis=dict(
-                    range=[self.plot_bounds_min[2], self.plot_bounds_max[2]],
-                    autorange=False,
-                ),
-                aspectmode="manual",
-                aspectratio=dict(
+            xaxis=dict(
+                range=[self.plot_bounds_min[0], self.plot_bounds_max[0]],
+                autorange=False,
+            ),
+            yaxis=dict(
+                range=[self.plot_bounds_min[1], self.plot_bounds_max[1]],
+                autorange=False,
+            ),
+            zaxis=dict(
+                range=[self.plot_bounds_min[2], self.plot_bounds_max[2]],
+                autorange=False,
+            ),
+            aspectmode="manual",
+            aspectratio=dict(
                 x=self.scene_scale[0], y=self.scene_scale[1], z=self.scene_scale[2]
             ),
         )
 
         # do not show grid and axes
         fig.update_scenes(
-                xaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
-                yaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
-                zaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
+            xaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
+            yaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
+            zaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
         )
+
+        # add scene_points_filted to the second subplot
+        # visualize scene points
+        if self.scene_points_filted is None:
+            print("no scene points to overlay, skipping...")
+            scene_points = None
+        else:
+            scene_points, scene_point_colors = self.scene_points_filted
+            # resample to reduce the number of points
+            if scene_points.shape[0] > self.max_scene_points:
+                resample_idx = np.random.choice(
+                    scene_points.shape[0],
+                    min(scene_points.shape[0], self.max_scene_points),
+                    replace=False,
+                )
+                scene_points = scene_points[resample_idx]
+                if scene_point_colors is not None:
+                    scene_point_colors = scene_point_colors[resample_idx]
+            if scene_point_colors is None:
+                scene_point_colors = scene_points[:, 2]
+            else:
+                scene_point_colors = scene_point_colors / 255.0
+            # add scene points
+            fig.add_trace(
+                go.Scatter3d(
+                    x=scene_points[:, 0],
+                    y=scene_points[:, 1],
+                    z=scene_points[:, 2],
+                    mode="markers",
+                    name="scene points filtered",
+                    marker=dict(size=3, color=scene_point_colors, opacity=1.0),
+                ),
+                row=2,
+                col=1,
+            )
 
         # set background color as white
         # fig.update_scenes(template="none")
-
         fig.add_trace(
             go.Scatter(
                 x=[1, 2, 3],
