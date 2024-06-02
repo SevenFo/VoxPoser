@@ -1,0 +1,40 @@
+import numpy as np
+from env_utils import execute
+from perception_utils import parse_query_obj
+import action_utils import composer
+
+objects = ['table', 'yellow block']
+# Query: go to the table
+composer('move to 100cm above the table')
+# done
+
+objects = ['table', 'yellow block']
+# Query: move forword
+composer('move forward to 100cm from your current position')
+# done
+
+objects = ['blue block', 'yellow block', 'mug']
+# Query: fly to the yellow block, and avoid the mug at all time. 
+composer('move to 100cm above the yellow block while keeping at least 30cm away from the mug')
+# done
+
+objects= ['black car', 'people']
+# Query: track the black car.
+composer('move 100cm above the back of the black car')
+# done
+
+objects = ['blue block', 'mug']
+# Query: Fly to a point 100cm above the mug, then move to a point that is 100cm to the left of the current position.
+controlled_object = parse_query_obj('controlled object')
+current_position = controlled_object.position # record current position
+composer("move to a point 100cm above the mug")
+composer(f"move to a point 100cm to the left of {current_position}")
+# done
+
+objects = ['table', 'cup']
+# Query: fly over the table and back
+controlled_object = parse_query_obj('controlled object')
+current_position = controlled_object.position # record the point I started
+composer("move to 100cm above the table")
+composer(f"move to {current_position}") # return to the place I started
+# done
