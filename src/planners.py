@@ -1,4 +1,5 @@
 """Greedy path planner."""
+
 import numpy as np
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import distance_transform_edt
@@ -101,7 +102,9 @@ class PathPlanner:
         )
         # show all paths for debugging
         for i in range(0, len(processed_path)):
-            print(f"[planners.py | {get_clock_time(milliseconds=True)}] {processed_path[i]}")
+            print(
+                f"[planners.py | {get_clock_time(milliseconds=True)}] {processed_path[i]}"
+            )
         print(
             f"[planners.py | {get_clock_time(milliseconds=True)}] last waypoint: {processed_path[-1]}"
         )
@@ -214,10 +217,11 @@ class PathPlanner:
             k = self.config["pushing_skip_per_k"]
             path = np.concatenate([path[k:-1:k], path[-1:]])
         # skip waypoints to reduce path length
-        skip_ratio = None
-        if skip_ratio is not None:
-            path = path[::skip_ratio]
-            if len(path) % skip_ratio != 1:
-                path = np.append(path, path[-1])
+        if "pick_per_k" in self.config:
+            pick_per_k = self.config["pick_per_k"]
+            # pick every pick_ratio-th waypoint
+            end_point = path[-1:, :]
+            path = path[::pick_per_k]
+            path = np.concatenate([path, end_point], axis=0)
         path = path.clip(0, self.map_size - 1)
-        return path
+        return path[1:, :]
