@@ -1,5 +1,4 @@
 from pyvirtualdisplay import Display
-from pyvirtualdisplay import Display
 import torch, os
 import open3d as o3d
 
@@ -15,40 +14,35 @@ from engine_interfaces import Dummy
 from VLMPipline.VLM import VLM
 from VLMPipline.VLMM import VLMProcessWrapper
 
-os.environ["HOME"] = "/"
+torch.set_grad_enabled(False)
+os.environ["ROS_MASTER_URI"] = "http://10.134.159.182:11311"
+os.environ["ROS_IP"] = "10.134.159.154"
+
 if __name__ == "__main__":
-    torch.set_grad_enabled(False)
-    disp = Display(visible=False, size=(1920, 1080))
-    disp.start()
+    # disp = Display(visible=False, size=(1920, 1080))
+    # disp.start()
     # vlm config
-    owlv2_model_path = os.path.expanduser(
-        "~/models/google-owlv2-large-patch14-finetuned"
-    )
-    owlv2_model_path = os.path.expanduser("~/models/google-owlv2-base-patch16-ensemble")
-    sam_model_path = os.path.expanduser("~/models/facebook-sam-vit-huge")
-    # sam_model_path = os.path.expanduser("~/models/facebook-sam-vit-base")
-    xmem_model_path = os.path.expanduser("~/models/XMem.pth")
-    resnet_18_path = os.path.expanduser("~/models/resnet18.pth")
-    resnet_50_path = os.path.expanduser("~/models/resnet50.pth")
+    owlv2_model_path = "/models/google-owlv2-large-patch14-finetuned"
+    owlv2_model_path = "/models/google-owlv2-base-patch16-ensemble"
+    sam_model_path = "/models/facebook-sam-vit-huge"
+    # sam_model_path = "/models/facebook-sam-vit-base"
+    xmem_model_path = "/models/XMem.pth"
+    resnet_18_path = "/models/resnet18.pth"
+    resnet_50_path = "/models/resnet50.pth"
     config_path = "./src/configs/pyrep_quadcopter.yaml"
-    # config_path = "./src/configs/airsim_ros_quadcopter.yaml"
-    scene_path = "./src/scene/quadcopter_tree_sofa_helicopter.ttt"
-    scene_target_objects = ["quadcopter", "sofa", "tree", "helicopter", "table"]
+    config_path = "./src/configs/airsim_ros_quadcopter.yaml"
+    config_path = "./src/configs/real_ros_quadcopter.yaml"
+    scene_target_objects = [
+        "pumpkin",
+        "house",
+        "apple",
+        "Stone lion statue",
+        "windmill",
+    ]
+    # scene_target_objects = [
+    #     "fire extinguisher",
+    # ]
     env_config = get_config(config_path=config_path)
-    vlmpipeline = VLMProcessWrapper(
-        scene_target_objects,
-        (5, 3, 480, 480),
-        owlv2_model_path,
-        sam_model_path,
-        xmem_model_path,
-        resnet_18_path,
-        resnet_50_path,
-        verbose=False,
-        resize_to=[480, 480],
-        verbose_frame_every=1,
-        input_batch_size=5,
-    )
-    vlmpipeline.start()
     # vlmpipeline = VLM(
     #     owlv2_model_path,
     #     sam_model_path,
@@ -71,6 +65,31 @@ if __name__ == "__main__":
     #     verbose_frame_every=1,
     #     input_batch_size=5,
     # )
+
+    input_shape = env_config.vlm["input_shape"]
+    batch_size = env_config.vlm["batch_size"]
+
+    if "scene_target_objects" in env_config.env:
+        scene_target_objects = env_config.env["scene_target_objects"]
+
+
+    vlmpipeline = VLMProcessWrapper(
+        scene_target_objects,
+        (batch_size,) + tuple(input_shape),
+        owlv2_model_path,
+        sam_model_path,
+        xmem_model_path,
+        resnet_18_path,
+        resnet_50_path,
+        resize_to=[640, 640],
+        category_multiplier=100,
+        verbose=True,
+        verbose_frame_every=1,
+        verbose_to_disk=True,
+        log_dir=env_config.log_dir,
+        input_batch_size=batch_size,
+    )
+    vlmpipeline.start()
     prefix = "/shared/codes/VoxPoser"
 
     # sparkv3_engine_config = load_config(os.path.join(prefix,"src/configs/sparkv3_config.yaml"))
@@ -96,32 +115,33 @@ if __name__ == "__main__":
     )  # engine initialization
 
     visualizer = ValueMapVisualizer(env_config["visualizer"])
-    env = VoxPoserPyRepQuadcopterEnv(
-        visualizer=visualizer,
-        headless=True,
-        coppelia_scene_path=scene_path,
+
+    env = VoxPoserROSDroneEnv(
         vlmpipeline=vlmpipeline,
+        visualizer=visualizer,
         target_objects=scene_target_objects,
+        configs=env_config.env,
     )
-    # env = VoxPoserROSDroneEnv(vlmpipeline=vlmpipeline, visualizer=visualizer)
+
     descriptions, obs = env.reset()
-    descriptions = "fly to the table, then fly to the tree, and at last fly to the sofa"
-    # descriptions = "fly to the apple, then fly to the point where you started"
+    # descriptions = "fly to the table, then fly to the tree, and at last fly to the sofa"
+    descriptions = (
+        "fly to the house, then fly to the point where you started"  # checked
+    )
+    # descriptions = "fly to the fire extinguisher"  # "  # underchecking
+    # descriptions = "fly forward 100cm"
+    if "description" in env_config.env:
+        descriptions = env_config.env["description"]
+        
     lmps, lmp_env = setup_LMP(
         env, env_config, debug=False, engine_call_fn=engine_tgi_deepseek33
     )
     voxposer_ui = lmps["plan_ui"]
     set_lmp_objects(lmps, env.get_object_names())
-    try:
-        voxposer_ui(descriptions)
-        env._pyrep.stop()
-        env._pyrep.shutdown()
-        env.vlm.shutdown()
-        disp.stop()
-
-    except Exception as e:
-        print(f"{type(e)}: {e}")
-        env._pyrep.stop()
-        env._pyrep.shutdown()
-        env.vlm.shutdown()
-        disp.stop()
+    # try:
+    voxposer_ui(descriptions)
+    # except Exception as e:
+    #     print(f"{type(e)}: {e}")
+    # env._pyrep.stop()
+    # env._pyrep.shutdown()
+    # disp.stop()

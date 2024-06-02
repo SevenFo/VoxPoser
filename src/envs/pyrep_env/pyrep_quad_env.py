@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import open3d as o3d
 import json
+from typing import Union
 
 from pyrep.const import ObjectType, RenderMode
 from pyrep.objects.vision_sensor import VisionSensor
@@ -11,6 +12,7 @@ from pyrep import PyRep
 from utils import normalize_vector, bcolors, Observation
 from visualizers import ValueMapVisualizer
 from VLMPipline.VLM import VLM
+from VLMPipline.VLMM import VLMProcessWrapper
 from VLMPipline.utils import convert_depth_to_pointcloud
 from envs.pyrep_env.pyrepqudacopter import PyRepQuadcopter
 
@@ -56,7 +58,7 @@ class VoxPoserPyRepQuadcopterEnv:
         coppelia_scene_path="quadcopter.ttt",
         visualizer: ValueMapVisualizer = None,
         headless=False,
-        vlmpipeline: VLM = None,
+        vlmpipeline: Union[VLM, VLMProcessWrapper] = None,
         target_objects=["quadcopter", "table"],
     ):
         """
@@ -382,9 +384,10 @@ class VoxPoserPyRepQuadcopterEnv:
                 [2, 0, 1]
             )
         frames = np.stack(list(rgb_frames.values()), axis=0)
-        masks = self.vlm.process_first_frame(
-            self.target_objects, frames, verbose=True, owlv2_threshold=0.1
-        )
+        # masks = self.vlm.process_first_frame(
+        #     self.target_objects, frames, verbose=True, owlv2_threshold=0.1
+        # )
+        masks = self.vlm.process_first_frame(frames)
         if not np.any(masks):
             raise ValueError(
                 "no intrested object found in the scene, may be you should let robot turn around or change the scene or change the target object"
@@ -463,7 +466,8 @@ class VoxPoserPyRepQuadcopterEnv:
                 [2, 0, 1]
             )
         frames = np.stack(list(rgb_frames.values()), axis=0)
-        masks = self.vlm.process_frame(frames, verbose=True)
+        # masks = self.vlm.process_frame(frames, verbose=True)
+        masks = self.vlm.process_frame(frames)
         if not np.any(masks):
             raise ValueError(
                 "no intrested object found in the scene, may be you should let robot turn around or change the scene or change the target object"

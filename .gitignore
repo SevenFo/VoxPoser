@@ -2,6 +2,8 @@
 **/__pycache__
 src/visualizations/
 visualizations/
+logs/
+dumps/
 visualizations*.tar
 src/cache
 src/achieves/
