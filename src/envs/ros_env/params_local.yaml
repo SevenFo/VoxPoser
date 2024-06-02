@@ -1,0 +1,76 @@
+cameras:
+  - 
+    name: "camera_drone_front"
+    camera_base_link_frame_id: "camera_drone_front_base_link"
+    rgb_topic_name: "/camera/color/image_raw"
+    depth_topic_name: "/camera/aligned_depth_to_color/image_raw"
+    cloudpoint_topic_name: "/camera/aligned_depth_to_color/registered/points"
+    rgb_camera_info_topic_name: "/camera/color/camera_info"
+    depth_camera_info_topic_name: "/camera/aligned_depth_to_color/camera_info"
+    rgb_frame_id: "camera_color_frame"
+    depth_frame_id: "camera_depth_frame"
+    cloudpoint_frame_id: "camera_cloudpoint_frame"
+  # - 
+  #   name: "camera_assistant_1"
+  #   camera_base_link_frame_id: "camera_assistant_1_base_link"
+  #   rgb_topic_name: "/camera_assistant_1/color/image_raw"
+  #   depth_topic_name: "/camera_assistant_1/depth/image_raw"
+  #   cloudpoint_topic_name: "/camera_assistant_1/depth/points"
+  #   rgb_camera_info_topic_name: "/camera_assistant_1/rgb/camera_info"
+  #   depth_camera_info_topic_name: "/camera_assistant_1/depth/camera_info"
+  #   rgb_frame_id: "camera_assistant_1_rgb_frame"
+  #   depth_frame_id: "camera_assistant_1_depth_frame"
+  #   cloudpoint_frame_id: "camera_assistant_1_cloudpoint_frame"
+  # -
+  #   name: "camera_assistant_2"
+  #   camera_base_link_frame_id: "camera_assistant_2_base_link"
+  #   rgb_topic_name: "/camera_assistant_2/color/image_raw"
+  #   depth_topic_name: "/camera_assistant_2/depth/image_raw"
+  #   cloudpoint_topic_name: "/camera_assistant_2/depth/points"
+  #   rgb_camera_info_topic_name: "/camera_assistant_2/rgb/camera_info"
+  #   depth_camera_info_topic_name: "/camera_assistant_2/depth/camera_info"
+  #   rgb_frame_id: "camera_assistant_2_rgb_frame"
+  #   depth_frame_id: "camera_assistant_2_depth_frame"
+  #   cloudpoint_frame_id: "camera_assistant_2_cloudpoint_frame"
+  # - 
+  #   name: "camera_assistant_3"
+  #   camera_base_link_frame_id: "camera_assistant_3_base_link"
+  #   rgb_topic_name: "/camera_assistant_3/color/image_raw"
+  #   depth_topic_name: "/camera_assistant_3/depth/image_raw"
+  #   cloudpoint_topic_name: "/camera_assistant_3/depth/points"
+  #   rgb_camera_info_topic_name: "/camera_assistant_3/rgb/camera_info"
+  #   depth_camera_info_topic_name: "/camera_assistant_3/depth/camera_info"
+  #   rgb_frame_id: "camera_assistant_3_rgb_frame"
+  #   depth_frame_id: "camera_assistant_3_depth_frame"
+  #   cloudpoint_frame_id: "camera_assistant_3_cloudpoint_frame"
+world_frame_id: "world_enu" # right +x, front +y, up +z
+optitrack_frame_id: "optitrack" # 
+optitrack_frame_to_world_frame:
+  transform: [5, 5, 0] # the center of the test site
+  rotation: [ 0, 0, 1, 0 ] # x y z w (fix RPY: 0 0 180)
+drone_origin_frame_id: "world"
+drone_baselink_frame_id: "drone_base_link"
+frames_tree:
+  world:
+    optitrack:
+      drone_origin:
+        drone_base_link:
+          - camera_drone_front_base_link:
+            - camera_drone_front_rgb_frame
+            - camera_drone_front_depth_frame
+            - camera_drone_front_cloudpoint_frame
+          - camera_assistant_1_base_link:
+            - camera_assistant_1_rgb_frame
+            - camera_assistant_1_depth_frame
+            - camera_assistant_1_cloudpoint_frame
+          - camera_assistant_2_base_link:
+            - camera_assistant_2_rgb_frame
+            - camera_assistant_2_depth_frame
+            - camera_assistant_2_cloudpoint_frame
+          - camera_assistant_3_base_link:
+            - camera_assistant_3_rgb_frame
+            - camera_assistant_3_depth_frame
+            - camera_assistant_3_cloudpoint_frame
+action_client_name: "/move_base"
+drone_odom_topic_name: "/vins_fusion/imu_propagate"
+reset_service_name: "" # /airsim_node/reset 

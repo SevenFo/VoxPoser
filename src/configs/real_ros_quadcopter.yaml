@@ -1,15 +1,17 @@
-env_name: airsim_ros_quadcopter
+env_name: real_ros_quadcopter
 
-log_dir: ./logs/airsim_ros_quadcopter
+log_dir: ./logs/real_ros_quadcopter
 
 env:
-  workspace_bounds_min: [0, 0, 0]
-  workspace_bounds_max: [5, 5, 3]
-  ros_params: !include ../envs/ros_env/params_airsim.yaml
+  ros_params: !include ../envs/ros_env/params_local.yaml
+  workspace_bounds_min: [-2, 0, -1]
+  workspace_bounds_max: [2, 4, 2.1]
+  scene_target_objects: ['fire extinguisher']
+  description: "fly to the fire extinguisher"
 
 vlm:
-  input_shape: [3, 640, 640]
-  batch_size: 5
+  input_shape: [3, 480, 640]
+  batch_size: 1
 
 planner:
   stop_threshold: 0.001
@@ -23,7 +25,7 @@ planner:
   target_spacing: 1
   max_curvature: 3
   pushing_skip_per_k: 5
-  pick_per_k: 2
+  pick_per_k: 5
 
 controller:
   type: SimpleROSController
@@ -31,10 +33,10 @@ controller:
   num_samples: 10000
   ee_local: temperature
   e4_local_radius: 0.15
-  mode: velocity
+  mode: pose # pose, velocity
 
 visualizer:
-  save_dir: ./logs/airsim_ros_quadcopter/visualizations
+  save_dir: ./logs/real_ros_quadcopter/visualizations
   quality: low
   map_size: 100
 

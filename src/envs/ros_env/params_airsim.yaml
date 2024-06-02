@@ -1,0 +1,107 @@
+cameras:
+  - 
+    name: "camera_drone_front"
+    camera_base_link_frame_id: "camera_drone_front_base_link"
+    rgb_topic_name: "/airsim_node/drone_1/front_center/0/image_raw" # 必须
+    depth_topic_name: "/airsim_node/drone_1/front_center/1/image_raw"
+    cloudpoint_topic_name: "/airsim_node/drone_1/front_center/1/registered/points"  # 必须
+    rgb_camera_info_topic_name: "/airsim_node/drone_1/front_center/0/camera_info" # 必须
+    depth_camera_info_topic_name: "/airsim_node/drone_1/front_center/1/camera_info"
+    rgb_frame_id: "camera_front_center"
+    depth_frame_id: "camera_front_center"
+    cloudpoint_frame_id: "camera_front_center"
+  - 
+    name: "camera_front_left"
+    camera_base_link_frame_id: "camera_assistant_1_base_link"
+    rgb_topic_name: "/airsim_node/drone_1/front_left/0/image_raw"
+    depth_topic_name: "/airsim_node/drone_1/front_left/1/image_raw"
+    cloudpoint_topic_name: "/airsim_node/drone_1/front_left/1/registered/points"
+    rgb_camera_info_topic_name: "/airsim_node/drone_1/front_left/0/camera_info"
+    depth_camera_info_topic_name: "/airsim_node/drone_1/front_left/1/camera_info"
+    rgb_frame_id: "camera_front_left"
+    depth_frame_id: "camera_front_left"
+    cloudpoint_frame_id: "camera_front_left"
+  -
+    name: "camera_front_right"
+    camera_base_link_frame_id: "camera_assistant_2_base_link"
+    rgb_topic_name: "/airsim_node/drone_1/front_right/0/image_raw"
+    depth_topic_name: "/airsim_node/drone_1/front_right/1/image_raw"
+    cloudpoint_topic_name: "/airsim_node/drone_1/front_right/1/registered/points"
+    rgb_camera_info_topic_name: "/airsim_node/drone_1/front_right/0/camera_info"
+    depth_camera_info_topic_name: "/airsim_node/drone_1/front_right/1/camera_info"
+    rgb_frame_id: "camera_front_right"
+    depth_frame_id: "camera_front_right"
+    cloudpoint_frame_id: "camera_front_right"
+  - 
+    name: "camera_down_center"
+    camera_base_link_frame_id: "camera_assistant_3_base_link"
+    rgb_topic_name: "/airsim_node/drone_1/down_center/0/image_raw"
+    depth_topic_name: "/airsim_node/drone_1/down_center/1/image_raw"
+    cloudpoint_topic_name: "/airsim_node/drone_1/down_center/1/registered/points"
+    rgb_camera_info_topic_name: "/airsim_node/drone_1/down_center/0/camera_info"
+    depth_camera_info_topic_name: "/airsim_node/drone_1/down_center/1/camera_info"
+    rgb_frame_id: "camera_down_center"
+    depth_frame_id: "camera_down_center"
+    cloudpoint_frame_id: "camera_down_center"
+  - 
+    name: "camera_rear_center"
+    camera_base_link_frame_id: "camera_assistant_3_base_link"
+    rgb_topic_name: "/airsim_node/drone_1/rear_center/0/image_raw"
+    depth_topic_name: "/airsim_node/drone_1/rear_center/1/image_raw"
+    cloudpoint_topic_name: "/airsim_node/drone_1/rear_center/1/registered/points"
+    rgb_camera_info_topic_name: "/airsim_node/drone_1/rear_center/0/camera_info"
+    depth_camera_info_topic_name: "/airsim_node/drone_1/rear_center/1/camera_info"
+    rgb_frame_id: "camera_rear_center"
+    depth_frame_id: "camera_rear_center"
+    cloudpoint_frame_id: "camera_rear_center"
+world_frame_id: "world_enu" # right +x, front +y, up +z 必须
+optitrack_frame_id: "optitrack" # 
+optitrack_frame_to_world_frame:
+  transform: [5, 5, 0] # the center of the test site
+  rotation: [ 0, 0, 1, 0 ] # x y z w (fix RPY: 0 0 180)
+drone_origin_frame_id: "drone_origin"
+drone_baselink_frame_id: "drone_base_link"
+# 坐标系统
+frames_tree:
+  world:
+    optitrack:
+      drone_origin:
+        drone_base_link:
+          - camera_drone_front_base_link:
+            - camera_drone_front_rgb_frame
+            - camera_drone_front_depth_frame
+            - camera_drone_front_cloudpoint_frame
+          - camera_assistant_1_base_link:
+            - camera_assistant_1_rgb_frame
+            - camera_assistant_1_depth_frame
+            - camera_assistant_1_cloudpoint_frame
+          - camera_assistant_2_base_link:
+            - camera_assistant_2_rgb_frame
+            - camera_assistant_2_depth_frame
+            - camera_assistant_2_cloudpoint_frame
+          - camera_assistant_3_base_link:
+            - camera_assistant_3_rgb_frame
+            - camera_assistant_3_depth_frame
+            - camera_assistant_3_cloudpoint_frame
+action_client_name: "/action_client" # 必须
+action_type: MoveBaseAction
+action_goal_typedef:
+  target_pose:
+    header:
+      seq: 0
+      stamp:
+        secs: 0
+        nsecs: 0
+      frame_id: "world_enu" # 注意检查坐标系
+    pose:
+      position: # 只用到position
+        x: 0.0
+        y: 0.0
+        z: 0.0
+      orientation:
+        x: 0.0
+        y: 0.0
+        z: 0.0
+        w: 1.0
+drone_odom_topic_name: "/airsim_node/drone_1/odom_local_ned" # 必须
+reset_service_name: "/airsim_node/reset" # /airsim_node/reset 
