@@ -113,11 +113,15 @@ class LMP_interface:
         print(f"[interface.py] calling VLM to detect {obj_name}")
         if obj_name.lower() in EE_ALIAS:
             # 如果是执行器则不需要调用模型进行检测
+            print(
+                f"[interface.py:detect_quad] as {obj_name} is the end effector, returning it directly"
+            )
             obs_dict = dict()
             obs_dict["name"] = obj_name
             obs_dict["position"] = self.get_ee_pos()
             obs_dict["aabb"] = np.array([self.get_ee_pos(), self.get_ee_pos()])
             obs_dict["_position_world"] = self._env.get_ee_pos()
+
             return [Observation(obs_dict)]
         else:
             if type(self._env) == DummyEnv:
@@ -135,6 +139,11 @@ class LMP_interface:
             for id, obs_result in enumerate(obs_results):
                 obs_dict = dict()
                 obj_pc, obj_normal = obs_result
+                if obj_pc.size == 0:
+                    print(
+                        f"[interface.py:detect_quad] detected empty point cloud for {obj_name} (id: {id})"
+                    )
+                    continue
                 voxel_map = self._points_to_voxel_map(obj_pc)  # 体素图
                 aabb_min = self._world_to_voxel(
                     np.min(obj_pc, axis=0)
@@ -698,6 +707,15 @@ def pc2voxel_map(points, voxel_bounds_robot_min, voxel_bounds_robot_max, map_siz
     )
     # to integer
     _out = np.empty_like(voxel_xyz)
+    if np.nan or np.inf in voxel_xyz:
+        dump_file = f"./dumps/voxel_xyz_{get_clock_time(True)}.txt"
+        dump_file_replace = f"./dumps/voxel_xyz_replace_{get_clock_time(True)}.txt"
+        np.savetxt(dump_file, voxel_xyz)
+        print(
+            f"nan or inf in voxel_xyz, please check {dump_file}, we will replace them with numbers, please check {dump_file_replace}"
+        )
+        voxel_xyz = np.nan_to_num(voxel_xyz, copy=True)
+        np.savetxt(dump_file_replace, voxel_xyz)
     points_vox = np.round(voxel_xyz, 0, _out).astype(np.int32)
     voxel_map = np.zeros((map_size, map_size, map_size))
     for i in range(points_vox.shape[0]):
