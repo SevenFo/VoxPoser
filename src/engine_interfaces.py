@@ -13,6 +13,7 @@ from time import mktime
 from urllib.parse import urlencode
 from wsgiref.handlers import format_date_time
 from LLM_cache import DiskCache
+from utils import get_clock_time
 
 import websocket  # 使用websocket_client
 
@@ -29,7 +30,9 @@ def extract_content(text):
 
 
 def chinese_filter(text):
-    return re.sub(r"[\u4e00-\u9fa5]+|[“”‘’？》《￥，。；：【】、！]+", "", text)  # 清除字符串中的中文
+    return re.sub(
+        r"[\u4e00-\u9fa5]+|[“”‘’？》《￥，。；：【】、！]+", "", text
+    )  # 清除字符串中的中文
 
 
 class Ws_Param(object):
@@ -100,10 +103,14 @@ class ERNIE:
             "model_system_instruction"
         ]  # default system instruction
         self._cache_root_dir = kwargs["cache_root_dir"]
-        self._cache_dir_base = os.path.join(self._cache_root_dir, self._full_name)
-        if not os.path.exists(self._cache_dir_base):
+        self._cache_dir_base = os.path.join(
+            self._cache_root_dir, self._full_name, get_clock_time()
+        )
+        if self._load_cache and not os.path.exists(self._cache_dir_base):
             os.makedirs(self._cache_dir_base)
-        self._cache = DiskCache(load_cache=self._load_cache, cache_dir=self._cache_dir_base)
+        self._cache = DiskCache(
+            load_cache=self._load_cache, cache_dir=self._cache_dir_base
+        )
 
     def get_access_token(self):
         """
@@ -203,27 +210,33 @@ class ERNIE:
         self._cache[cache_key] = ret
         return ret
 
+
 class TGI:
     """
     class that warp the interface of TGI
     """
+
     def __init__(self, **kwargs) -> None:
         self._full_name = kwargs["type"] + kwargs["version"]
-        self._url = kwargs["url"] + ':' + str(kwargs["port"])
+        self._url = kwargs["url"] + ":" + str(kwargs["port"])
         self._model_instruction = kwargs["model_instruction"]
-        self._load_cache = False
+        # self._load_cache = False
         self._temperature = 0.1
-        if 'system_instruction' not in kwargs:
-            self._system_instruction = ''
+        if "system_instruction" not in kwargs:
+            self._system_instruction = ""
         else:
             self._system_instruction = kwargs["system_instruction"]
         if "load_cache" in kwargs:
             self._load_cache = kwargs["load_cache"]
         self._cache_root_dir = kwargs["cache_root_dir"]
-        self._cache_dir_base = os.path.join(self._cache_root_dir, self._full_name)
-        if not os.path.exists(self._cache_dir_base):
+        self._cache_dir_base = os.path.join(
+            self._cache_root_dir, self._full_name, get_clock_time()
+        )
+        if self._load_cache and not os.path.exists(self._cache_dir_base):
             os.makedirs(self._cache_dir_base)
-        self._cache = DiskCache(load_cache=self._load_cache, cache_dir=self._cache_dir_base)
+        self._cache = DiskCache(
+            load_cache=self._load_cache, cache_dir=self._cache_dir_base
+        )
 
     def __call__(self, **kwds: Any) -> Any:
         assert "prompt" in kwds.keys(), "engine call kwargs not contain messages"
@@ -268,7 +281,7 @@ class TGI:
             "max_new_tokens": 512,
             "temperature": temperature,
             "stop": stop_tokens,
-            "do_sample": True
+            "do_sample": True,
         }
         payload = json.dumps(
             {
@@ -278,13 +291,13 @@ class TGI:
                 "stop": stop_tokens,
             }
         )
-        payload = json.dumps(
-            {
-                "inputs": inputs,
-                "parameters": parameters
-            }
-        )
+        payload = json.dumps({"inputs": inputs, "parameters": parameters})
         headers = {"Content-Type": "application/json"}
+        cache_key = {f"{self._full_name}": payload}
+        if use_cache:
+            if cache_key in self._cache:
+                print("(using cache)", end=" ")
+                return self._cache[cache_key]
         try:
             # response = requests.request(
             #     "POST",
@@ -294,7 +307,7 @@ class TGI:
             # )
             response = requests.request(
                 "POST",
-                f'{self._url}/generate',
+                f"{self._url}/generate",
                 headers=headers,
                 data=payload,
             )
@@ -313,10 +326,11 @@ class TGI:
             ret = chinese_filter(code_str).strip()
 
         # whatever caching the result
-        # self._cache[cache_key] = ret
+        if self._load_cache:
+            self._cache[cache_key] = ret
         return ret
 
-        
+
 class Spark:
     def __init__(self, **kwargs) -> None:
         websocket.enableTrace(False)
@@ -335,8 +349,8 @@ class Spark:
         self._domain = kwargs["domain"]
         self._max_tokens = 512
         self._temperature = 0.1
-        if 'system_instruction' not in kwargs:
-            self._system_instruction = ''
+        if "system_instruction" not in kwargs:
+            self._system_instruction = ""
         else:
             self._system_instruction = kwargs["system_instruction"]
         self.answer = ""
@@ -414,7 +428,7 @@ class Spark:
             # so we can adjust the model instruction for any call
             # TODO
             model_instruction = kwargs["model_instruction"]
-        if self._system_instruction != '': # 其实更适合放在gen_param函数里面
+        if self._system_instruction != "":  # 其实更适合放在gen_param函数里面
             self.message.append(
                 {
                     "role": "system",
