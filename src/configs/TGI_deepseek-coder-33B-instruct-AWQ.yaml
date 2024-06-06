@@ -6,5 +6,5 @@ url: http://127.0.0.1
 port: 10014
 model_instruction: "continue the code to control the quadrotor to execute the task described in the Query, we have provided the code template, you need to complete the code to make the quadrotor complete the task, use Python"
 system_instruction: "you are a software engineer, you need to complete the code to control the quadrotor to execute the task described in the Query, we have provided the code template, you need to complete the code to make the quadrotor complete the task, use Python"
-load_cache: False
+load_cache: True
 cache_root_dir: ./cache

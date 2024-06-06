@@ -1,4 +1,6 @@
 from typing import Union, Callable
+import warnings
+from functools import partial
 from LMP import LMP
 from utils import (
     get_clock_time,
@@ -9,12 +11,12 @@ from utils import (
     VoxelIndexingWrapper,
 )
 import numpy as np
-from planners import PathPlanner
 import time
 from scipy.ndimage import distance_transform_edt
 import transforms3d
+import threading
 from controllers import Controller, SimpleQuadcopterController, SimpleROSController
-import controllers
+from planners import PathPlanner
 
 from envs.pyrep_env.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
 from envs.ros_env.ros_env import VoxPoserROSDroneEnv
@@ -60,6 +62,7 @@ class LMP_interface:
         self._cfg = lmp_config
         self._map_size = self._cfg["map_size"]
         self._planner = PathPlanner(planner_config, map_size=self._map_size)
+        self._latest_obs_results = {}
         _controller_type = controller_config["type"]
         if _controller_type == "SimpleQuadcopterController":
             self._controller = SimpleQuadcopterController(self._env, controller_config)
@@ -84,8 +87,8 @@ class LMP_interface:
     def get_ee_pos(self):
         return self._world_to_voxel(self._env.get_ee_pos())
 
-    def detect(self, obj_name):
-        return self.detect_quad(obj_name)
+    def detect(self, obj_name, enable_memory=False):
+        return self.detect_quad(obj_name, enable_memory)
 
     def execute(
         self,
@@ -95,7 +98,17 @@ class LMP_interface:
         velocity_map=None,
         rotation_map=None,
         gripper_map=None,
+        dynamic=False,
     ):
+        if dynamic:
+            return self.execute_quad_dynamic(
+                movable_obs_func,
+                affordance_map,
+                avoidance_map,
+                velocity_map,
+                rotation_map,
+                gripper_map,
+            )
         return self.execute_quad(
             movable_obs_func,
             affordance_map,
@@ -105,7 +118,7 @@ class LMP_interface:
             gripper_map,
         )
 
-    def detect_quad(self, obj_name):
+    def detect_quad(self, obj_name, enable_memory=False):
         """return an observation dict containing useful information about the object"""
         assert self._env.vlm is not None, "please enable VLM before calling detect_quad"
         object_obs_list = []
@@ -135,7 +148,17 @@ class LMP_interface:
             if (
                 obs_results is None
             ):  # actually if obs_results is None, it would raise an error in the get_3d_obs_by_name_by_vlm function or make quadcopter to fly higher?
-                return object_obs_list
+                if enable_memory and (obj_name in self._latest_obs_results):
+                    warnings.warn(
+                        f"[interface.py:detect_quad] failed to detect {obj_name}, using memory instead"
+                    )
+                    obs_results = self._latest_obs_results[
+                        obj_name
+                    ]  # use memory my cause some problems, as the object may have moved
+                else:
+                    return object_obs_list
+            elif enable_memory:
+                self._latest_obs_results.update({obj_name: obs_results})
             for id, obs_result in enumerate(obs_results):
                 obs_dict = dict()
                 obj_pc, obj_normal = obs_result
@@ -162,6 +185,310 @@ class LMP_interface:
                 obs_dict["normal"] = normalize_vector(obj_normal.mean(axis=0))
                 object_obs_list.append(Observation(obs_dict))
         return object_obs_list
+
+    def _plan(
+        self,
+        movable_obs_func: Callable,
+        affordance_map: Callable = None,
+        avoidance_map: Callable = None,
+        velocity_map: Callable = None,
+        rotation_map: Callable = None,
+        gripper_map: Callable = None,
+        object_centric: bool = False,
+        _plan_cond: threading.Condition = None,
+        _hz: float = 0.01,
+    ):
+        while self._enable_planning:
+            _plan_cond.acquire()
+            # _lock.acquire()  # prevent executing and planning at the same time
+            if self._enable_planning is False:
+                _plan_cond.release()
+                break
+            print(
+                f"{bcolors.OKBLUE}[interfaces.py | _plan | {get_clock_time()}] start planning{bcolors.ENDC}"
+            )
+            self.movable_obs = movable_obs_func()
+            self._affordance_map = affordance_map()
+            self._pre_avoidance_map = avoidance_map()
+            self._velocity_map = velocity_map()
+            self._avoidance_map = self._preprocess_avoidance_map(
+                self._pre_avoidance_map, self._affordance_map, self.movable_obs
+            )
+            # start planning
+            start_pos = self.movable_obs["position"]
+            start_time = time.time()
+            # optimize path and log
+            path_voxel, planner_info = self._planner.optimize(
+                start_pos,
+                self._affordance_map,
+                self._avoidance_map,
+                object_centric=object_centric,
+            )
+            print(
+                f"{bcolors.OKBLUE}[interfaces.py | _plan | {get_clock_time()}] planner time: {time.time() - start_time:.3f}s{bcolors.ENDC}"
+            )
+            assert len(path_voxel) > 0, "path_voxel is empty"
+            # convert voxel path to world trajectory, and include rotation, velocity, and gripper information
+            traj_world = self._path2traj(
+                path_voxel,
+                rotation_map=None,
+                velocity_map=self._velocity_map,
+                gripper_map=None,
+            )  # we will get a list of tuple: (world_xyz, rotation, velocity, gripper)
+            self.traj_world = traj_world[: self._cfg["num_waypoints_per_plan"]]
+            _plan_cond.notify()
+            _plan_cond.wait(1 / _hz)
+            print(
+                f"{bcolors.OKBLUE}[interfaces.py | _plan | {get_clock_time()}] weak up, waiting for lock{bcolors.ENDC}"
+            )
+        print(
+            f"{bcolors.OKBLUE}[interfaces.py | _plan | {get_clock_time()}] target readch, finished planning{bcolors.ENDC}"
+        )
+
+    def _check_terminate(self, movable_obs_func, affordance_map_func):
+        # get the latest observation
+        self.movable_obs = movable_obs_func()
+        self._affordance_map = affordance_map_func()
+        curr_pos = self.movable_obs.position
+        if distance_transform_edt(1 - self._affordance_map)[tuple(curr_pos)] <= 2:
+            print(
+                f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] reached target; terminating {bcolors.ENDC}"
+            )
+            return True
+        # if not finish, then wait for the new traj to be planned
+        return False
+
+    def execute_quad_dynamic(
+        self,
+        movable_obs_func: Callable,
+        affordance_map: Callable = None,
+        avoidance_map: Callable = None,
+        velocity_map: Callable = None,
+        rotation_map: Callable = None,
+        gripper_map: Callable = None,
+    ):
+        """
+        First use planner to generate waypoint path, then use controller to follow the waypoints.
+
+        Args:
+          movable_obs_func: callable function to get observation of the body to be moved
+          affordance_map: callable function that generates a 3D numpy array, the target voxel map
+          avoidance_map: callable function that generates a 3D numpy array, the obstacle voxel map
+          rotation_map: callable function that generates a 4D numpy array, the rotation voxel map (rotation is represented by a quaternion *in world frame*), not used for quadricopter
+          velocity_map: callable function that generates a 3D numpy array, the velocity voxel map
+          gripper_map: callable function that generates a 3D numpy array, the gripper voxel map, not used for quadricopter
+        """
+        print("[interface.py] calling execute")
+        assert gripper_map is None, "gripper_map is not used for quadricopter"
+        assert (
+            rotation_map is None
+        ), "rotation_map is not used for quadricopter as we havent implemented it"
+        # initialize default voxel maps if not specified
+        if velocity_map is None:
+            velocity_map = self._get_default_voxel_map("velocity")
+        if avoidance_map is None:
+            avoidance_map = self._get_default_voxel_map("obstacle")
+        self._enable_planning: bool = True
+        _plan_cond = threading.Condition()
+
+        object_centric = (
+            movable_obs_func()["name"] not in EE_ALIAS
+        )  # false as the object is the quadricopter
+        assert not object_centric, "the movable object must be the quadricopter"
+        _plan_thread = threading.Thread(
+            target=self._plan,
+            args=(
+                movable_obs_func,
+                affordance_map,
+                avoidance_map,
+                velocity_map,
+                rotation_map,
+                gripper_map,
+                object_centric,
+                _plan_cond,
+            ),
+        )
+        self.traj_world = []
+        _plan_thread.setDaemon(True)
+        _plan_thread.start()
+        execute_info = []
+        if affordance_map is not None:
+            # execute path in closed-loop
+            print(f"[interface.py] max plan iter: {self._cfg['max_plan_iter']}")
+            for plan_iter in range(self._cfg["max_plan_iter"]):
+                print(f"[interface.py] plan iter: {plan_iter}")
+                step_info = dict()
+                # # evaluate voxel maps such that we use latest information
+                # # 即：假设在execute的时候环境已经发生了变化，那么这里就会重新计算一次voxel map
+                # # 在执行路径的时候，不会对voxel map进行修改，也就是说不会调用detect函数来检测物体
+                # movable_obs = movable_obs_func()  # get static observation?
+                # _affordance_map = affordance_map()
+                # _pre_avoidance_map = avoidance_map()
+                # _velocity_map = velocity_map()
+                # # preprocess avoidance map
+                # _avoidance_map = self._preprocess_avoidance_map(
+                #     _pre_avoidance_map, _affordance_map, movable_obs
+                # )
+                # # start planning
+                # start_pos = movable_obs["position"]
+                # start_time = time.time()
+                # # optimize path and log
+                # path_voxel, planner_info = self._planner.optimize(
+                #     start_pos,
+                #     _affordance_map,
+                #     _avoidance_map,
+                #     object_centric=object_centric,
+                # )
+                # print(
+                #     f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] planner time: {time.time() - start_time:.3f}s{bcolors.ENDC}"
+                # )
+                # step_info["path_voxel"] = path_voxel
+                # step_info["planner_info"] = planner_info
+
+                # step_info["start_pos"] = start_pos
+                # step_info["plan_iter"] = plan_iter
+                # step_info["movable_obs"] = movable_obs
+                # step_info["traj_world"] = traj_world
+                # step_info["affordance_map"] = _affordance_map
+                # step_info["rotation_map"] = (
+                #     rotation_map() if rotation_map is not None else None
+                # )
+                # step_info["velocity_map"] = _velocity_map
+                # step_info["gripper_map"] = (
+                #     gripper_map() if gripper_map is not None else None
+                # )
+                # step_info["avoidance_map"] = _avoidance_map
+                # step_info["pre_avoidance_map"] = _pre_avoidance_map
+
+                # # visualize
+                # if self._cfg["visualize"]:
+                #     assert self._env.visualizer is not None
+                #     step_info["start_pos_world"] = self._voxel_to_world(start_pos)
+                #     step_info["targets_world"] = self._voxel_to_world(
+                #         planner_info["targets_voxel"]
+                #     )
+                #     self._env.visualizer.visualize(step_info)
+                print(
+                    f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] start executing path via controller){bcolors.ENDC}"
+                )
+                with _plan_cond:
+                    if len(self.traj_world) == 0:
+                        print(
+                            f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] waiting for path to be planned{bcolors.ENDC}"
+                        )
+                        _plan_cond.wait()
+                # execute path
+                step_index = 0
+                while True:
+                    _plan_cond.acquire()
+                    waypoint = self.traj_world[0]
+                    # execute one step
+                    # TODO skip waypoint if moving to this point is going in opposite direction of the final target point
+                    # (for example, if you have over-pushed an object, no need to move back)
+                    controller_info = self._controller.execute(
+                        movable_obs=movable_obs_func(), waypoint=waypoint
+                    )  # TODO check if the movement is finished
+                    # loggging
+                    movable_obs = movable_obs_func()
+                    dist2target = np.linalg.norm(
+                        movable_obs["_position_world"] - self.traj_world[-1][0]
+                    )
+                    if not object_centric and controller_info["mp_info"] == -1:
+                        print(
+                            f'{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] failed waypoint {step_index} (wp: {waypoint[0].round(3)}, actual: {movable_obs["_position_world"].round(3)}, target: {self.traj_world[-1][0].round(3)}, start: {self.traj_world[0][0].round(3)}, dist2target: {dist2target.round(3)}); mp info: {controller_info["mp_info"]}{bcolors.ENDC}'
+                        )
+                    else:
+                        print(
+                            f'{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] completed waypoint {step_index} (wp: {waypoint[0].round(3)}, actual: {movable_obs["_position_world"].round(3)}, target: {self.traj_world[-1][0].round(3)}, start: {self.traj_world[0][0].round(3)}, dist2target: {dist2target.round(3)}){bcolors.ENDC}'
+                        )
+                    # reaching judgement
+                    if (
+                        dist2target <= 0.1
+                    ):  # check for current trajectory, if the distance to the final target is less than 0.1
+                        print(
+                            f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] close to the target point of this traj; remove all remained waypoints{bcolors.ENDC}"
+                        )
+                        self.traj_world.clear()
+                    else:
+                        self.traj_world.pop(0)
+                    if self.traj_world == []:
+                        print(
+                            f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] reached last waypoint; judge whether to terminate{bcolors.ENDC}"
+                        )
+                        if self._check_terminate(movable_obs_func, affordance_map):
+                            self._enable_planning = False
+                            _plan_cond.notify_all()
+                            _plan_cond.release()
+                            break
+                        else:
+                            print(
+                                f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] have not reached target; waiting for new path to be planned{bcolors.ENDC}"
+                            )
+                            _plan_cond.notify()
+                            _plan_cond.wait()
+                    else:
+                        _plan_cond.release()
+                    time.sleep(0.01)  # sleep 0.01 seconds to release the GIL
+                    step_index += 1
+
+                controller_infos = dict()
+                # for i, waypoint in enumerate(traj_world):
+                #     # check if the movement is finished
+                #     if (
+                #         np.linalg.norm(
+                #             movable_obs["_position_world"] - traj_world[-1][0]
+                #         )
+                #         <= 0.01
+                #     ):
+                #         print(
+                #             f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] reached last waypoint; curr_xyz={movable_obs['_position_world']}, target={traj_world[-1][0]} (distance: {np.linalg.norm(movable_obs['_position_world'] - traj_world[-1][0]):.3f})){bcolors.ENDC}"
+                #         )
+                #         break
+                #     # skip waypoint if moving to this point is going in opposite direction of the final target point
+                #     # (for example, if you have over-pushed an object, no need to move back)
+                #     if i != 0 and i != len(traj_world) - 1:
+                #         movable2target = (
+                #             traj_world[-1][0] - movable_obs["_position_world"]
+                #         )
+                #         movable2waypoint = waypoint[0] - movable_obs["_position_world"]
+                #         if np.dot(movable2target, movable2waypoint).round(3) <= 0:
+                #             print(
+                #                 f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] skip waypoint {i+1} because it is moving in opposite direction of the final target{bcolors.ENDC}"
+                #             )
+                #             continue
+                #     # execute waypoint
+                #     controller_info = self._controller.execute(movable_obs, waypoint)
+                #     # loggging
+                #     movable_obs = movable_obs_func()
+                #     dist2target = np.linalg.norm(
+                #         movable_obs["_position_world"] - traj_world[-1][0]
+                #     )
+                #     if not object_centric and controller_info["mp_info"] == -1:
+                #         print(
+                #             f'{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] failed waypoint {i+1} (wp: {waypoint[0].round(3)}, actual: {movable_obs["_position_world"].round(3)}, target: {traj_world[-1][0].round(3)}, start: {traj_world[0][0].round(3)}, dist2target: {dist2target.round(3)}); mp info: {controller_info["mp_info"]}{bcolors.ENDC}'
+                #         )
+                #     else:
+                #         print(
+                #             f'{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] completed waypoint {i+1} (wp: {waypoint[0].round(3)}, actual: {movable_obs["_position_world"].round(3)}, target: {traj_world[-1][0].round(3)}, start: {traj_world[0][0].round(3)}, dist2target: {dist2target.round(3)}){bcolors.ENDC}'
+                #         )
+                #     controller_info["controller_step"] = i
+                #     controller_info["target_waypoint"] = waypoint
+                #     controller_infos[i] = controller_info
+                step_info["controller_infos"] = controller_infos
+                execute_info.append(step_info)
+                # check whether we need to replan
+                # curr_pos = movable_obs["position"]
+                # if distance_transform_edt(1 - _affordance_map)[tuple(curr_pos)] <= 2:
+                #     print(
+                #         f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] reached target; terminating {bcolors.ENDC}"
+                #     )
+                #     break
+                break
+        print(
+            f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] finished executing path via controller{bcolors.ENDC}"
+        )
+        self._env.visualizer.save_gifs()
+        return execute_info
 
     def execute_quad(
         self,
@@ -601,8 +928,19 @@ def setup_LMP(env, general_config, debug=False, engine_call_fn=None):
     variable_vars = {
         k: getattr(lmp_env, k)
         for k in dir(lmp_env)
-        if callable(getattr(lmp_env, k)) and not k.startswith("_")
+        if callable(getattr(lmp_env, k))
+        and not k.startswith("_")
+        and not k == "execute"
+        and not k == "detect"
     }  # our custom APIs exposed to LMPs
+
+    variable_vars["execute"] = partial(
+        lmp_env.execute, dynamic=lmp_env_config["execute_dynamic"]
+    )
+
+    variable_vars["detect"] = partial(
+        lmp_env.detect, enable_memory=lmp_env_config["detect_memory"]
+    )
 
     # allow LMPs to access other LMPs
     lmp_names = [
@@ -700,14 +1038,14 @@ def pc2voxel_map(points, voxel_bounds_robot_min, voxel_bounds_robot_max, map_siz
     # make sure the point is within the voxel bounds
     points = np.clip(points, voxel_bounds_robot_min, voxel_bounds_robot_max)
     # voxelize
-    voxel_xyz = (
+    voxel_xyz: np.array = (
         (points - voxel_bounds_robot_min)
         / (voxel_bounds_robot_max - voxel_bounds_robot_min)
         * (map_size - 1)
     )
     # to integer
     _out = np.empty_like(voxel_xyz)
-    if np.nan or np.inf in voxel_xyz:
+    if np.any(np.isnan(voxel_xyz)) or np.any(np.isinf(voxel_xyz)):
         dump_file = f"./dumps/voxel_xyz_{get_clock_time(True)}.txt"
         dump_file_replace = f"./dumps/voxel_xyz_replace_{get_clock_time(True)}.txt"
         np.savetxt(dump_file, voxel_xyz)

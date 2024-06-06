@@ -63,7 +63,7 @@ ret_val = None
 # done
 
 objects = ['anything not quadcopter', 'anything except quadcopter', 'whatever']
-# Query: quadcopter. # if query quadcopter, just detect it
+# Query: quadcopter. # if query quadcopter/controlled object or something like this, just call detect function to detect it and return the result
 quadcopter = detect('quadcopter')
 ret_val = quadcopter[0]
 # done
