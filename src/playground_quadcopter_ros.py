@@ -11,7 +11,7 @@ from VLMPipline.VLMM import VLMProcessWrapper
 
 torch.set_grad_enabled(False)
 os.environ["ROS_MASTER_URI"] = "http://localhost:11311"
-os.environ["ROS_IP"] = "localhost"
+# os.environ["ROS_IP"] = ""
 
 if __name__ == "__main__":
     # disp = Display(visible=False, size=(1920, 1080))
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         resnet_50_path,
         resize_to=[640, 640],
         category_multiplier=100,
-        verbose=True,
+        verbose=False,
         verbose_frame_every=1,
         verbose_to_disk=True,
         log_dir=env_config.log_dir,

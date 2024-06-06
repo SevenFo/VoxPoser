@@ -1,3 +1,4 @@
+import warnings
 import openai
 from time import sleep
 from openai import RateLimitError, APIConnectionError
@@ -76,7 +77,13 @@ class LMP:
         if any(
             [
                 chat_model in kwargs["model"]
-                for chat_model in ["gpt-3.5", "gpt-4", "SparkV3", "ERNIEV4", "SparkV3.5"]
+                for chat_model in [
+                    "gpt-3.5",
+                    "gpt-4",
+                    "SparkV3",
+                    "ERNIEV4",
+                    "SparkV3.5",
+                ]
             ]
         ):
             ret = self._engine_call(
@@ -189,11 +196,12 @@ class LMP:
         if self._cfg["maintain_session"]:
             self._variable_vars.update(lvars)
 
+        print(f"[LMP.py | {self._name}] calling end")
         if self._cfg["has_return"]:
             if self._name == "parse_query_obj":
                 try:
                     # there may be multiple objects returned, but we also want them to be unevaluated functions so that we can access latest obs
-                    # 似乎 detect 函数返回的对象是一个函数，这样通过调用（evaluated）这个函数，便可以得到该对象的最新信息
+                    # 由于parse_query_obj会被包装成一个函数，这样通过调用（evaluated）这个函数，便可以得到该对象的动态最新信息，（需要时再detect）
                     return IterableDynamicObservation(
                         lvars[self._cfg["return_val_name"]]
                     )
@@ -212,8 +220,10 @@ def exec_safe(code_str, gvars=None, lvars=None):
         assert phrase not in code_str, "banned phrases appear in model ret"
 
     if gvars is None:
+        warnings.warn("gvars is None, creating empty dict")
         gvars = {}
     if lvars is None:
+        warnings.warn("lvars is None, creating empty dict")
         lvars = {}
     empty_fn = lambda *args, **kwargs: None
     custom_gvars = merge_dicts([gvars, {"exec": empty_fn, "eval": empty_fn}])

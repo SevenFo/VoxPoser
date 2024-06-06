@@ -1,4 +1,5 @@
 from typing import Callable, Union
+import time
 import scipy
 import scipy.ndimage
 import transforms3d.utils
@@ -32,12 +33,12 @@ import transforms3d
 from std_srvs.srv import SetBool, SetBoolResponse
 import matplotlib.pyplot as plt
 from functools import partial
-from utils import normalize_vector, bcolors, Observation
+from utils import normalize_vector, bcolors, Observation, timer_decorator
 from threading import Event as threading_Event
 import copy
 
 WIDTH = 640
-HEIGHT = 480
+HEIGHT = 640
 
 
 class VoxPoserROSDroneEnv:
@@ -296,10 +297,10 @@ class VoxPoserROSDroneEnv:
                 rospy.sleep(1)
             rgb_frames[cam] = self.snaped_obs[f"{cam}_rgb"].transpose([2, 0, 1])
         frames = np.stack(list(rgb_frames.values()), axis=0)
-        pcd = self.snaped_obs[f"{self.camera_names[0]}_cloudpoint"]
-        np.savetxt("snaped_cloudpoint.txt", pcd)
-        plt.imshow((self.snaped_obs[f"{self.camera_names[0]}_rgb"]).astype(np.uint8))
-        plt.savefig("snaped_rgb.png")
+        # pcd = self.snaped_obs[f"{self.camera_names[0]}_cloudpoint"]
+        # np.savetxt("snaped_cloudpoint.txt", pcd)
+        # plt.imshow((self.snaped_obs[f"{self.camera_names[0]}_rgb"]).astype(np.uint8))
+        # plt.savefig("snaped_rgb.png")
 
         return frames
 
@@ -395,24 +396,24 @@ class VoxPoserROSDroneEnv:
             obj_mask = (
                 masks == obj_ins_id + self.category_multiplier * category_label
             )  # [False,True,False,False,False,False,False,False,False] for first loop
-            plt.imshow(
-                (obj_mask.astype(np.uint8) * np.array([255], dtype=np.uint8)).reshape(
-                    HEIGHT, WIDTH
-                )
-            )
-            plt.savefig(f"{query_name}_{obj_ins_id}_mask.png")
+            # plt.imshow(
+            #     (obj_mask.astype(np.uint8) * np.array([255], dtype=np.uint8)).reshape(
+            #         HEIGHT, WIDTH
+            #     )
+            # )
+            # plt.savefig(f"{query_name}_{obj_ins_id}_mask.png")
             obj_points = points[obj_mask]
             obj_normals = normals[obj_mask]
             # remove nan from point
             nan_mask = ~np.isnan(obj_points).any(axis=1)
             obj_points = obj_points[nan_mask]
             obj_normals = obj_normals[nan_mask]
-            np.savetxt(
-                f"{query_name}_{obj_ins_id}_cloudpoint_all.txt", np.asarray(points)
-            )
-            np.savetxt(
-                f"{query_name}_{obj_ins_id}_cloudpoint_np.txt", np.asarray(obj_points)
-            )
+            # np.savetxt(
+            #     f"{query_name}_{obj_ins_id}_cloudpoint_all.txt", np.asarray(points)
+            # )
+            # np.savetxt(
+            #     f"{query_name}_{obj_ins_id}_cloudpoint_np.txt", np.asarray(obj_points)
+            # )
             # voxel downsample using o3d
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(obj_points)
@@ -427,27 +428,27 @@ class VoxPoserROSDroneEnv:
             objs_normals.append(obj_normals_dsf)
             if self.visualizer is not None:
                 self.visualizer.add_object_points(
-                    np.asarray(pcd_downsampled_filted.points),
+                    obj_normals_dsf,
                     f"{query_name}_{obj_ins_id}",
                 )
             # save pcd to file for debug
-            o3d.io.write_point_cloud(
-                f"{query_name}_{obj_ins_id}.pcd", pcd_downsampled_filted
-            )
-            np.savetxt(
-                f"{query_name}_{obj_ins_id}_cloudpoint.txt", np.asarray(obj_points)
-            )
-            np.savetxt(
-                f"{query_name}_{obj_ins_id}_cloudpoint_ds.txt",
-                np.asarray(pcd_downsampled.points),
-            )
-            np.savetxt(
-                f"{query_name}_{obj_ins_id}_cloudpoint_dsf.txt",
-                np.asarray(pcd_downsampled_filted.points),
-            )
+            # o3d.io.write_point_cloud(
+            #     f"{query_name}_{obj_ins_id}.pcd", pcd_downsampled_filted
+            # )
+            # np.savetxt(
+            #     f"{query_name}_{obj_ins_id}_cloudpoint.txt", np.asarray(obj_points)
+            # )
+            # np.savetxt(
+            #     f"{query_name}_{obj_ins_id}_cloudpoint_ds.txt",
+            #     np.asarray(pcd_downsampled.points),
+            # )
+            # np.savetxt(
+            #     f"{query_name}_{obj_ins_id}_cloudpoint_dsf.txt",
+            #     np.asarray(pcd_downsampled_filted.points),
+            # )
             assert len(obj_points) > 0, f"no points found for {query_name}_{obj_ins_id}"
         print(f"we find {len(objs_points)} instances of {query_name}")
-        return zip(objs_points, objs_normals)
+        return list(zip(objs_points, objs_normals))
 
     def get_scene_3d_obs(
         self, ignore_robot=False, ignore_grasped_obj=False, do_gaussian_filter=False
@@ -550,8 +551,8 @@ class VoxPoserROSDroneEnv:
             # result = self._action_client.send_goal_and_wait(goal, rospy.Duration(30))
             self._action_client.send_goal(goal)
             while rospy.get_param("/fsm/drone_state") != 1:
-                rospy.loginfo("waiting for drone to reach the target position")
-                rospy.sleep(1)
+                rospy.loginfo_once("waiting for drone to reach the target position")
+                rospy.sleep(0.1)
             # if result != GoalStatus.SUCCEEDED:
             #     raise ValueError(f"the action {action} failed")
         elif mode == "velocity":
@@ -562,7 +563,7 @@ class VoxPoserROSDroneEnv:
                 len(action) == 4
             ), "the action should be [linear_x, linear_y, linear_z, angular_z]"
             self._cmd_pub.publish(Twist(Vector3(*action[:3]), Vector3(0, 0, action[3])))
-            rospy.sleep(0.2)
+            rospy.sleep(0.1) if not update_mask else None
         if update_mask:
             # masks = self.vlm.process_frame(self._get_rgb_frames(), verbose=True)
             masks = self.vlm.process_frame(self._get_rgb_frames())  # snap obs
@@ -596,16 +597,17 @@ class VoxPoserROSDroneEnv:
 
         return self.apply_action(init_pose + [0, 0, 0, 1])
 
+    @timer_decorator
     def _update_visualizer(self):
         if self.visualizer is not None:
             points, colors = self.get_scene_3d_obs(
                 ignore_robot=False, ignore_grasped_obj=False
             )
-            points_filtered, _ = self.get_scene_3d_obs(
-                ignore_robot=False, ignore_grasped_obj=False, do_gaussian_filter=True
-            )
+            # points_filtered, _ = self.get_scene_3d_obs(
+            #     ignore_robot=False, ignore_grasped_obj=False, do_gaussian_filter=True
+            # )
             self.visualizer.update_scene_points(points, colors)
-            self.visualizer.update_scene_points_filted(points_filtered, None)
+            # self.visualizer.update_scene_points_filted(points_filtered, None)
             fig = plt.figure(figsize=(6.4 * len(self.camera_names), 4.8))
             for idx, cam in enumerate(self.camera_names):
                 rgb = self.snaped_obs[f"{cam}_rgb"]
@@ -643,7 +645,7 @@ class VoxPoserROSDroneEnv:
         Returns:
             np.ndarray: The end effector position.
         """
-        rospy.loginfo(f"get_ee_pos: {self.latest_obs['quad_pose'][:3]}")
+        # rospy.loginfo(f"get_ee_pos: {self.latest_obs['quad_pose'][:3]}")
         return self.latest_obs["quad_pose"][:3]
 
     def get_ee_quat(self):

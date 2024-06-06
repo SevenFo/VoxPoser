@@ -6,6 +6,17 @@ import datetime
 from transforms3d.quaternions import mat2quat
 
 
+def timer_decorator(func):
+    def wrapper(*args, **kwargs):
+        start_time = datetime.datetime.now()
+        result = func(*args, **kwargs)
+        end_time = datetime.datetime.now()
+        print(f"Function {func.__name__} took {end_time - start_time}")
+        return result
+
+    return wrapper
+
+
 def set_lmp_objects(lmps, objects):
     if isinstance(lmps, dict):
         lmps = lmps.values()
@@ -16,9 +27,9 @@ def set_lmp_objects(lmps, objects):
 def get_clock_time(milliseconds=False):
     curr_time = datetime.datetime.now()
     if milliseconds:
-        return f"{curr_time.hour}:{curr_time.minute}:{curr_time.second}.{curr_time.microsecond // 1000}"
+        return f"{curr_time.hour}-{curr_time.minute}-{curr_time.second}-{curr_time.microsecond // 1000}"
     else:
-        return f"{curr_time.hour}:{curr_time.minute}:{curr_time.second}"
+        return f"{curr_time.hour}-{curr_time.minute}-{curr_time.second}"
 
 
 class bcolors:
@@ -44,7 +55,7 @@ def load_prompt(prompt_fname):
         full_path = os.path.join(curr_dir, "prompts", prompt_fname)
     # read file
     try:
-        with open(full_path, "r", encoding='utf-8') as f:
+        with open(full_path, "r", encoding="utf-8") as f:
             contents = f.read().strip()
     except UnicodeDecodeError as e:
         print(f"UnicodeDecodeError in {full_path}: {e}")

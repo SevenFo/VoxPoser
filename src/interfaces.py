@@ -939,7 +939,7 @@ def setup_LMP(env, general_config, debug=False, engine_call_fn=None):
     )
 
     variable_vars["detect"] = partial(
-        lmp_env.detect, enable_memory=lmp_env_config["detect_memory"]
+        lmp_env.detect, enable_memory=lmp_env_config["enable_memory"]
     )
 
     # allow LMPs to access other LMPs
