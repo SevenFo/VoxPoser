@@ -331,7 +331,7 @@ class SimpleROSController:
 target position: {target_xyz[0]:.3},{target_xyz[1]:.3},{target_xyz[2]:.3} \
 error: {np.linalg.norm(error):.3} kp: {kp:.2}, ki: {ki:.2}"
         )
-        while np.linalg.norm(error) > 0.15:
+        while np.linalg.norm(error) > 0.1:
             self.integral += error
             velocity = kp * error + ki * self.integral
             # move to target pose directly
