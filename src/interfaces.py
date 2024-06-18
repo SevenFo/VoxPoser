@@ -930,8 +930,8 @@ def setup_LMP(env, general_config, debug=False, engine_call_fn=None):
         for k in dir(lmp_env)
         if callable(getattr(lmp_env, k))
         and not k.startswith("_")
-        and not k == "execute"
-        and not k == "detect"
+        and not k.startswith("execute")
+        and not k.startswith("detect")
     }  # our custom APIs exposed to LMPs
 
     variable_vars["execute"] = partial(
@@ -946,7 +946,7 @@ def setup_LMP(env, general_config, debug=False, engine_call_fn=None):
     lmp_names = [
         name
         for name in lmps_config.keys()
-        if not name in ["composer", "planner", "config"]
+        if name not in ["composer", "planner", "config"]
     ]
     low_level_lmps = {
         k: LMP(
