@@ -22,3 +22,4 @@ src/CMakeLists.txt
 build/
 devel/
 *.mp4
+cache/
