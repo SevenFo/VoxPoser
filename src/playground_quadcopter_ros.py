@@ -94,6 +94,7 @@ if __name__ == "__main__":
     tgi_config33 = load_config(
         os.path.join(prefix, "src/configs/TGI_deepseek-coder-33B-instruct-AWQ.yaml")
     )
+    ollama_config = load_config(os.path.join(prefix, "src/configs/ollama_config.yaml"))
     # engine_erniev4 = getattr(engine_interfaces, erniev4_engine_config["type"])(
     #     **erniev4_engine_config
     # )  # engine initialization
@@ -106,7 +107,9 @@ if __name__ == "__main__":
     engine_tgi_deepseek33 = getattr(engine_interfaces, tgi_config["type"])(
         **tgi_config33
     )  # engine initialization
-
+    engine_ollama_deepseek33_q4 = getattr(engine_interfaces, ollama_config["type"])(
+        **ollama_config
+    )
     visualizer = ValueMapVisualizer(env_config["visualizer"])
 
     env = VoxPoserROSDroneEnv(
@@ -128,7 +131,7 @@ if __name__ == "__main__":
         descriptions = env_config.env["description"]
 
     lmps, lmp_env = setup_LMP(
-        env, env_config, debug=False, engine_call_fn=engine_tgi_deepseek33
+        env, env_config, debug=False, engine_call_fn=engine_ollama_deepseek33_q4
     )
     voxposer_ui = lmps["plan_ui"]
     set_lmp_objects(lmps, env.get_object_names())

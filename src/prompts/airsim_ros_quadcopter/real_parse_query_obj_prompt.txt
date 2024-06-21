@@ -67,3 +67,9 @@ objects = ['anything not quadcopter', 'anything except quadcopter', 'whatever']
 quadcopter = detect('quadcopter')
 ret_val = quadcopter[0]
 # done
+
+objects = ['blue block', 'red block']
+# Query: quadcopter.
+quadcopter = detect('quadcopter')
+ret_val = quadcopter[0]
+# done

@@ -1,0 +1,9 @@
+type: Ollama
+model: qwen2
+url: http://127.0.0.1
+port: 11434
+default_temperature: 0.3
+model_instruction: "" # To complete the code required by the Query, you don't need to add any explanatory text, just start with python code
+system_instruction: "you are a software engineer, you need to complete the code to control the quadrotor to execute the task described in the Query, we have provided the code template, you need to complete the code to make the quadrotor complete the task, use Python"
+load_cache: True
+cache_root_dir: ./cache

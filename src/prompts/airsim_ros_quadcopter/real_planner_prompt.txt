@@ -1,7 +1,7 @@
 import numpy as np
 from env_utils import execute
 from perception_utils import parse_query_obj
-import action_utils import composer
+from action_utils import composer
 
 objects = ['table', 'yellow block']
 # Query: go to the table
