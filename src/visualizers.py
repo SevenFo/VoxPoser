@@ -100,11 +100,6 @@ class ValueMapVisualizer:
         mask = np.logical_not(np.any(mask, axis=1))
         points = points[mask, :]
         points = points.astype(np.float16)
-        if colors is None:
-            colors = np.zeros(
-                (points.shape[0], 3), dtype=np.uint8
-            )  # default color is black
-        assert colors.dtype == np.uint8
         self.scene_points = (points, colors)
 
     def update_scene_points_filted(self, points: np.array, colors=None):
@@ -482,3 +477,164 @@ class ValueMapVisualizer:
             fig.show()
 
         return fig
+
+    def visualize_plan_result(self, info):
+        planner_info = info["planner_info"]
+        waypoints_world = np.array([p[0] for p in info["traj_world"]])
+        start_pos_world = info["start_pos_world"].squeeze()
+        target_world = info["target_world"].squeeze()
+        plan_iter = info["plan_iter"]
+        assert len(start_pos_world.shape) == 1
+        waypoints_world = np.concatenate(
+            [start_pos_world[None, ...], waypoints_world], axis=0
+        )
+        fig_data = []
+        # plot path
+        # add marker to path waypoints
+        fig_data.append(
+            go.Scatter3d(
+                x=waypoints_world[:, 0],
+                y=waypoints_world[:, 1],
+                z=waypoints_world[:, 2],
+                mode="markers",
+                name="waypoints",
+                marker=dict(size=4, color="red"),
+            )
+        )
+        # add lines between waypoints
+        for i in range(waypoints_world.shape[0] - 1):
+            fig_data.append(
+                go.Scatter3d(
+                    x=waypoints_world[i : i + 2, 0],
+                    y=waypoints_world[i : i + 2, 1],
+                    z=waypoints_world[i : i + 2, 2],
+                    mode="lines",
+                    name="path",
+                    line=dict(width=10, color="orange"),
+                )
+            )
+        # add start pos marker
+        fig_data.append(
+            go.Scatter3d(
+                x=[start_pos_world[0]],
+                y=[start_pos_world[1]],
+                z=[start_pos_world[2]],
+                mode="markers",
+                name="start",
+                marker=dict(size=6, color="blue"),
+            )
+        )
+        # add target point marker
+        fig_data.append(
+            go.Scatter3d(
+                x=[target_world[0]],
+                y=[target_world[1]],
+                z=[target_world[2]],
+                mode="markers",
+                name="target",
+                marker=dict(size=6, color="green"),
+            )
+        )
+        if planner_info is not None:
+            if "costmap" in planner_info:
+                # Downsample the costmap, :: means sample points every downsample_ratio
+                costmap = planner_info["costmap"][
+                    :: self.downsample_ratio,
+                    :: self.downsample_ratio,
+                    :: self.downsample_ratio,
+                ]
+                self._add_voxel_map(costmap, "costmap", fig_data)
+
+            if "target_map" in planner_info:
+                target_map = planner_info["target_map"][
+                    :: self.downsample_ratio,
+                    :: self.downsample_ratio,
+                    :: self.downsample_ratio,
+                ]
+                self._add_voxel_map(target_map, "target_map", fig_data)
+
+            if "obstacle_map" in planner_info:
+                obstacle_map = planner_info["obstacle_map"][
+                    :: self.downsample_ratio,
+                    :: self.downsample_ratio,
+                    :: self.downsample_ratio,
+                ]
+                self._add_voxel_map(obstacle_map, "obstacle_map", fig_data)
+
+        # scence points
+        if self.scene_points is None:
+            print("no scene points to overlay, skipping...")
+            scene_points = None
+        else:
+            scene_points, scene_point_colors = self.scene_points
+            # resample to reduce the number of points
+            if scene_points.shape[0] > self.max_scene_points:
+                resample_idx = np.random.choice(
+                    scene_points.shape[0],
+                    min(scene_points.shape[0], self.max_scene_points),
+                    replace=False,
+                )
+                scene_points = scene_points[resample_idx]
+                if scene_point_colors is not None:
+                    scene_point_colors = scene_point_colors[resample_idx]
+            if scene_point_colors is None:
+                scene_point_colors = scene_points[:, 2]  # use depth as color
+            else:
+                scene_point_colors = scene_point_colors / 255.0
+            # add scene points
+            fig_data.append(
+                go.Scatter3d(
+                    x=scene_points[:, 0],
+                    y=scene_points[:, 1],
+                    z=scene_points[:, 2],
+                    mode="markers",
+                    name="scene points",
+                    marker=dict(size=1, color=scene_point_colors, opacity=1.0),
+                )
+            )
+
+        fig = make_subplots(
+            rows=1,
+            cols=1,
+            specs=[[{"type": "scene"}]],
+            subplot_titles=["display"],
+        )
+
+        for trace in fig_data:
+            fig.add_trace(trace, row=1, col=1)
+
+        # set bounds and ratio
+        fig.update_scenes(
+            xaxis=dict(
+                range=[self.plot_bounds_min[0], self.plot_bounds_max[0]],
+                autorange=False,
+            ),
+            yaxis=dict(
+                range=[self.plot_bounds_min[1], self.plot_bounds_max[1]],
+                autorange=False,
+            ),
+            zaxis=dict(
+                range=[self.plot_bounds_min[2], self.plot_bounds_max[2]],
+                autorange=False,
+            ),
+            aspectmode="manual",
+            aspectratio=dict(
+                x=self.scene_scale[0], y=self.scene_scale[1], z=self.scene_scale[2]
+            ),
+        )
+        # do not show grid and axes
+        fig.update_scenes(
+            xaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
+            yaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
+            zaxis=dict(showgrid=False, showticklabels=True, title="", visible=True),
+        )
+        if self.save_dir is not None:
+            # TODO concurrent.futures
+            log_id = "plan_iter_" + str(plan_iter)
+            save_path = os.path.join(self.save_dir, log_id + ".html")
+            latest_save_path = os.path.join(self.save_dir, "latest.html")
+            print("** saving visualization to", save_path, "...")
+            fig.write_html(save_path)
+            print("** saving visualization to", latest_save_path, "...")
+            fig.write_html(latest_save_path)
+            print(f"** save to {save_path}")

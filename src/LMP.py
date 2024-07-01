@@ -1,13 +1,11 @@
 import warnings
 import openai
 from time import sleep
-from openai import RateLimitError, APIConnectionError
 from pygments import highlight
 from pygments.lexers import PythonLexer
 from pygments.formatters import TerminalFormatter
 from utils import load_prompt, DynamicObservation, IterableDynamicObservation
 import time, textwrap, inspect, re
-from LLM_cache import DiskCache
 
 
 class LMP:
@@ -32,9 +30,8 @@ class LMP:
         self._variable_vars = variable_vars
         self.exec_hist = ""
         self._context = None
-        # self._cache = DiskCache(load_cache=self._cfg["load_cache"])
         self._engine_call = engine_call_fn
-        self._history_file_name = f"code-history.txt"
+        self._history_file_name = "code-history.txt"
 
     def clear_exec_hist(self):
         self.exec_hist = ""
@@ -72,33 +69,6 @@ class LMP:
 
         return prompt, user_query, self.split_prompt(prompt=prompt)
 
-    def _cached_api_call(self, **kwargs):
-        # check whether completion endpoint or chat endpoint is used
-        if any(
-            [
-                chat_model in kwargs["model"]
-                for chat_model in [
-                    "gpt-3.5",
-                    "gpt-4",
-                    "SparkV3",
-                    "ERNIEV4",
-                    "SparkV3.5",
-                ]
-            ]
-        ):
-            ret = self._engine_call(
-                **kwargs
-            )  # i wish every engine should define an function to call
-            return ret
-        else:
-            if kwargs in self._cache:
-                print("(using cache)", end=" ")
-                return self._cache[kwargs]
-            else:
-                ret = openai.Completion.create(**kwargs)["choices"][0]["text"].strip()
-                self._cache[kwargs] = ret
-                return ret
-
     def __call__(self, query, **kwargs):
         calling_level = len(inspect.getouterframes(inspect.currentframe())) // 3
         print(f"[LMP.py | {self._name}] calling level:", calling_level)
@@ -117,8 +87,8 @@ class LMP:
                     use_cache=self._cfg["load_cache"],
                 )
                 break
-            except (RateLimitError, APIConnectionError) as e:
-                print(f"LLM API got err {e}")
+            except Exception as e:
+                print(f"LLM API got err {type(e)}: {e}")
                 print("Retrying after 3s.")
                 sleep(3)
         print(f"*** LLM API call took {time.time() - start_time:.2f}s ***")
@@ -153,15 +123,12 @@ class LMP:
         lvars = kwargs
 
         # return function instead of executing it so we can replan using latest obs（do not do this for high-level UIs)
-        if not self._name in ["composer", "planner"]:
+        if self._name not in ["composer", "planner"]:
             to_exec = "def ret_val():\n" + to_exec.replace("ret_val = ", "return ")
             to_exec = to_exec.replace("\n", "\n    ")
 
-        with open(self._history_file_name, "r+") as f:
-            file_content = f.read()
-
         if calling_level == 0:
-            with open(self._history_file_name, "w") as f:
+            with open(self._history_file_name, "w+") as f:
                 f.write(f"{to_log.strip()}\n")
         else:
             with open(self._history_file_name, "a") as f:

@@ -197,8 +197,9 @@ class LMP_interface:
         gripper_map: Callable = None,
         object_centric: bool = False,
         _plan_cond: threading.Condition = None,
-        _hz: float = 0.1,
+        _hz: float = 0.03,
     ):
+        plan_iter = 0
         while self._enable_planning:
             # _plan_cond.acquire()
             # if self._enable_planning is False:
@@ -224,6 +225,7 @@ class LMP_interface:
                 self._avoidance_map,
                 object_centric=object_centric,
             )
+            plan_iter += 1
             print(
                 f"{bcolors.OKBLUE}[interfaces.py | _plan | {get_clock_time()}] planner time: {time.time() - start_time:.3f}s{bcolors.ENDC}"
             )
@@ -237,6 +239,18 @@ class LMP_interface:
             )  # we will get a list of tuple: (world_xyz, rotation, velocity, gripper)
             _plan_cond.acquire()
             self.traj_world = traj_world[: self._cfg["num_waypoints_per_plan"]]
+            info = dict()
+            if self._cfg["visualize"]:
+                info["planner_info"] = planner_info
+                info["traj_world"] = self.traj_world
+                info["movable_obs"] = self.movable_obs
+                info["plan_iter"] = plan_iter
+                info["start_pos"] = start_pos
+                info["start_pos_world"] = self._voxel_to_world(start_pos)
+                info["target_world"] = self._voxel_to_world(
+                    planner_info["targets_voxel"]
+                )
+                self._env.visualizer.visualize_plan_result(info)
             _plan_cond.notify()
             _plan_cond.wait(1 / _hz)
             print(
@@ -256,6 +270,10 @@ class LMP_interface:
                 f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] reached target; terminating {bcolors.ENDC}"
             )
             return True
+        else:
+            print(
+                f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] have not reached target; dist: {distance_transform_edt(1 - self._affordance_map)[tuple(curr_pos)]}{bcolors.ENDC}"
+            )
         # if not finish, then wait for the new traj to be planned
         return False
 
@@ -332,7 +350,6 @@ class LMP_interface:
             print(f"[interface.py] max plan iter: {self._cfg['max_plan_iter']}")
             for plan_iter in range(self._cfg["max_plan_iter"]):
                 print(f"[interface.py] plan iter: {plan_iter}")
-                step_info = dict()
                 print(
                     f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] start executing path via controller){bcolors.ENDC}"
                 )
@@ -347,6 +364,9 @@ class LMP_interface:
                 while True:
                     _plan_cond.acquire()
                     waypoint = self.traj_world[0]
+                    print(
+                        f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] current jraj: \n{self.traj_world}{bcolors.ENDC}"
+                    )
                     _plan_cond.release()
                     # execute one step
                     # TODO skip waypoint if moving to this point is going in opposite direction of the final target point
@@ -397,11 +417,6 @@ class LMP_interface:
                         _plan_cond.release()
                     time.sleep(0.01)  # sleep 0.01 seconds to release the GIL
                     step_index += 1
-
-                controller_infos = dict()
-
-                step_info["controller_infos"] = controller_infos
-                execute_info.append(step_info)
 
                 break
         print(

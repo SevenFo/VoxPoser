@@ -1,5 +1,7 @@
 from pyvirtualdisplay import Display
-import torch, os
+import torch
+import os
+import time
 
 from yaml_config_utils import get_config, load_config
 from interfaces import setup_LMP
@@ -60,6 +62,11 @@ if __name__ == "__main__":
     #     input_batch_size=5,
     # )
 
+    log_dir = os.path.join(
+        env_config.log_dir,
+        f"{time.strftime('%Y-%m-%d-%H-%M-%S')}",
+    )
+    env_config["visualizer"]["save_dir"] = os.path.join(log_dir, "visualizer")
     input_shape = env_config.vlm["input_shape"]
     batch_size = env_config.vlm["batch_size"]
 
@@ -83,30 +90,11 @@ if __name__ == "__main__":
         input_batch_size=batch_size,
     )
     vlmpipeline.start()
+
     prefix = "/shared/codes/VoxPoser"
 
-    # sparkv3_engine_config = load_config(os.path.join(prefix,"src/configs/sparkv3_config.yaml"))
-    # sparkv35_engine_config = load_config(os.path.join(prefix,"src/configs/sparkv3_5_config.yaml"))
-    # erniev4_engine_config = load_config(os.path.join(prefix,"src/configs/ERNIEv4_config.yaml"))
-    tgi_config = load_config(
-        os.path.join(prefix, "src/configs/TGI_deepseek-coder-6.7B-instruct-AWQ.yaml")
-    )
-    tgi_config33 = load_config(
-        os.path.join(prefix, "src/configs/TGI_deepseek-coder-33B-instruct-AWQ.yaml")
-    )
     ollama_config = load_config(os.path.join(prefix, "src/configs/ollama_config.yaml"))
-    # engine_erniev4 = getattr(engine_interfaces, erniev4_engine_config["type"])(
-    #     **erniev4_engine_config
-    # )  # engine initialization
-    # engine_sparkv3 = getattr(engine_interfaces, sparkv3_engine_config["type"])(
-    #     **sparkv35_engine_config
-    # )  # engine initialization
-    engine_tgi_deepseek = getattr(engine_interfaces, tgi_config["type"])(
-        **tgi_config
-    )  # engine initialization
-    engine_tgi_deepseek33 = getattr(engine_interfaces, tgi_config["type"])(
-        **tgi_config33
-    )  # engine initialization
+
     engine_ollama_deepseek33_q4 = getattr(engine_interfaces, ollama_config["type"])(
         **ollama_config
     )

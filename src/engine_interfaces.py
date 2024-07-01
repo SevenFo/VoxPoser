@@ -360,22 +360,13 @@ class Ollama:
         assert (
             len(splited_prompt) % 2 == 1
         ), f"len(splited_prompt)={len(splited_prompt)}, please ask assistant"
-        use_cache = False  # whether or not checking cache before calling API online
-        if "use_cache" in kwds and self._load_cache:
-            use_cache = kwds["use_cache"]
-        temperature = self._temperature  # get default temperature
-        stop_tokens = []
-        model_instruction = self._model_instruction  # get default model_instruction
-        if "model_instruction" in kwds.keys():
-            # override the model instruction but not override the system instruction
-            # so we can adjust the model instruction for any call
-            # TODO
-            model_instruction = kwds["model_instruction"]
-        if "stop" in kwds.keys():
-            stop_tokens = kwds["stop"]
-        if "temperature" in kwds.keys():
-            # override the default temperature if it in kwds
-            temperature = kwds["temperature"]
+
+        use_cache = False if ("use_cache" not in kwds or not self._load_cache) else kwds["use_cache"]
+        temperature = self._temperature if "temperature" not in kwds else kwds["temperature"]
+        model_instruction = self._model_instruction if "model_instruction" not in kwds else kwds["model_instruction"]
+        stop_tokens = [] if "stop" not in kwds else kwds["stop"]
+        
+        # Treat example codes as conversation history
         messages = []
         messages.append(
             {
@@ -392,22 +383,21 @@ class Ollama:
                     ],
                 }
             )
-        options = {
-            "num_predict": 512,
-            "num_ctx": 2564,
-            "temperature": temperature,
-            "stop": stop_tokens,
-            "top_k": 40,
-            "top_p": 0.9,
-        }
+
         payload = json.dumps(
             {
                 "model": self._model_name,
                 "messages": messages,
-                # "system": self._system_instruction,
                 "stream": False,
                 "keep_alive": "5m",
-                "options": options,
+                "options": {
+                    "num_predict": 512,
+                    "num_ctx": 2564,
+                    "temperature": temperature,
+                    "stop": stop_tokens,
+                    "top_k": 40,
+                    "top_p": 0.9,
+                },
             }
         )
         headers = {"Content-Type": "application/json"}
@@ -425,6 +415,7 @@ class Ollama:
             )
             response = response.json()
             code_str = response["message"]["content"]
+
             # To calculate how fast the response is generated in tokens per second (token/s), divide eval_count / eval_duration * 10^9.
             generated_speed = response["eval_count"] / response["eval_duration"] * 10**9
             print(
@@ -435,7 +426,7 @@ class Ollama:
             print(response.content)
             print(payload)
             exit(1)
-            # todo: if reach the max length of API limit, need to switch to a shorter version
+            # TODO: if reach the max length of API limit, need to switch to a shorter version
         except Exception as e:
             print("KeyError:", e)
             print(response.content)
