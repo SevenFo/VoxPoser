@@ -35,6 +35,7 @@ import matplotlib.pyplot as plt
 from functools import partial
 from utils import normalize_vector, bcolors, Observation, timer_decorator
 from threading import Event as threading_Event
+from threading import RLock as threading_Lock
 import copy
 
 WIDTH = 640
@@ -76,6 +77,7 @@ class VoxPoserROSDroneEnv:
         self.configs = configs.ros_params
         if self.configs is not None:
             self.camera_names = [item["name"] for item in self.configs.cameras]
+        self._lock = threading_Lock()
         self.init_ros()
         self.init_task()
 
@@ -113,7 +115,7 @@ class VoxPoserROSDroneEnv:
         }
 
     def init_ros(self):
-        rospy.init_node("voxposer")
+        rospy.init_node("voxposer", disable_signals=True)
         self._tf_buffer = tf2_ros.Buffer()
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer)
 
@@ -201,39 +203,6 @@ class VoxPoserROSDroneEnv:
                 self.configs.reset_service_name, SetBool
             )
 
-    def point_front_center_sub_callback(self, msg: PointCloud2):
-        rospy.loginfo(
-            f"received pointcloud from {msg.header.frame_id}, look up transform"
-        )
-        trans: TransformStamped = self._tf_buffer.lookup_transform(
-            self._world_frame_id, msg.header.frame_id, rospy.Time(0)
-        )
-        point = np.frombuffer(
-            msg.data, dtype=np.float32
-        ).reshape(
-            -1, 4
-        )[
-            :, 0:3
-        ]  # 除那12字节外，最后4字节填了个固定值kPointCloudComponentFourMagic(1)，有的文章把这分量称为强度或者反射值r
-        rotation_matrix = transforms3d.quaternions.quat2mat(
-            [
-                trans.transform.rotation.w,
-                trans.transform.rotation.x,
-                trans.transform.rotation.y,
-                trans.transform.rotation.z,
-            ]
-        )
-        translation = np.array(
-            [
-                trans.transform.translation.x,
-                trans.transform.translation.y,
-                trans.transform.translation.z,
-            ]
-        ).reshape(1, 3)
-        point = point @ rotation_matrix.T + translation
-        self.latest_obs.update({"front_center_cloudpoint": point})
-        rospy.loginfo(f"update finished")
-
     def get_object_names(self):
         return self.target_objects
 
@@ -253,35 +222,37 @@ class VoxPoserROSDroneEnv:
             # rospy.loginfo(
             #     f"transform odom from {msg.header.frame_id} to {self._world_frame_id}"
             # )
-        self.latest_obs.update(
-            {
-                "quad_pose": np.array(
-                    [
-                        pose.position.x,
-                        pose.position.y,
-                        pose.position.z,
-                        pose.orientation.x,
-                        pose.orientation.y,
-                        pose.orientation.z,
-                        pose.orientation.w,
-                    ]
-                    + list(
-                        transforms3d.euler.quat2euler(
-                            [
-                                pose.orientation.w,
-                                pose.orientation.x,
-                                pose.orientation.y,
-                                pose.orientation.z,
-                            ]
+        with self._lock:
+            self.latest_obs.update(
+                {
+                    "quad_pose": np.array(
+                        [
+                            pose.position.x,
+                            pose.position.y,
+                            pose.position.z,
+                            pose.orientation.x,
+                            pose.orientation.y,
+                            pose.orientation.z,
+                            pose.orientation.w,
+                        ]
+                        + list(
+                            transforms3d.euler.quat2euler(
+                                [
+                                    pose.orientation.w,
+                                    pose.orientation.x,
+                                    pose.orientation.y,
+                                    pose.orientation.z,
+                                ]
+                            )
                         )
                     )
-                )
-            }
-        )
+                }
+            )
 
     def _snap_obs(self):
         # deepcopy the latest_obs
-        self.snaped_obs = copy.deepcopy(self.latest_obs)
+        with self._lock:
+            self.snaped_obs = copy.deepcopy(self.latest_obs)
 
     def _get_rgb_frames(self):
         self._snap_obs()
@@ -292,7 +263,7 @@ class VoxPoserROSDroneEnv:
                 or f"{cam}_cloudpoint" not in self.snaped_obs
             ):
                 # raise ValueError(f"no {cam}_rgb found")
-                rospy.loginfo("waiting for rgb image")
+                rospy.loginfo(f"waiting for {cam}_rgb image and {cam}_cloudpoint")
                 self._snap_obs()
                 rospy.sleep(1)
             rgb_frames[cam] = self.snaped_obs[f"{cam}_rgb"].transpose([2, 0, 1])
@@ -681,38 +652,12 @@ class VoxPoserROSDroneEnv:
         self.name2categerylabel = {}  # first_generation name -> label
         self.categerylabel2name = {}  # label -> first_generation name
 
-    def camera_info_sub_front_center_callback(self, msg):
-        extrinsic_params = np.array(msg.P).reshape(3, 4)
-        intrinsic_params = np.array(msg.K).reshape(3, 3)
-        self.camera_params = {
-            "front_center": {
-                "extrinsic_params": extrinsic_params,
-                "intrinsic_params": intrinsic_params,
-                "far_near": [3.5, 0.05],
-            }
-        }
-        look_at = extrinsic_params[:3, :3] @ np.array([0, 0, 1])
-        self.lookat_vectors["front_center"] = normalize_vector(look_at)
-
-    def rgb_image_sub_front_center_callback(self, msg):
-        self.latest_obs.update(
-            {
-                "front_center_rgb": cv2.cvtColor(
-                    self._cvb.imgmsg_to_cv2(msg), cv2.COLOR_BGR2RGB
-                )
-            }
-        )
-
     def cloudpoint_sub_calllback_template(
         self, msg: PointCloud2, key: str, event: threading_Event
     ):
         # 除那12字节外，最后4字节填了个固定值kPointCloudComponentFourMagic(1)，有的文章把这分量称为强度或者反射值r
-        # event.wait() # wait for the event to be set
         point = np.frombuffer(msg.data, dtype=np.float32).reshape(-1, 4)[:, 0:3]
         if msg.header.frame_id != self._world_frame_id:
-            # rospy.loginfo(
-            #     f"received pointcloud from {msg.header.frame_id}, look up transform"
-            # )
             trans: TransformStamped = self._tf_buffer.lookup_transform(
                 self._world_frame_id, msg.header.frame_id, rospy.Time(0)
             )
@@ -732,15 +677,13 @@ class VoxPoserROSDroneEnv:
                 ]
             ).reshape(1, 3)
             point = point @ rotation_matrix.T + translation
-        self.latest_obs.update({f"{key}": point})
-        # event.clear()
-        # rospy.loginfo(f"update cloudpoint from {msg.header.frame_id} finished")
+        with self._lock:
+            self.latest_obs.update({f"{key}": point})
 
     def rgb_image_sub_callback_template(self, msg: Image, key: str):
-        # rospy.loginfo(f"received rgb image from {msg.header.frame_id}")
-        self.latest_obs.update(
-            {f"{key}": cv2.cvtColor(self._cvb.imgmsg_to_cv2(msg), cv2.COLOR_BGR2RGB)}
-        )
+        rgb_data = cv2.cvtColor(self._cvb.imgmsg_to_cv2(msg), cv2.COLOR_BGR2RGB)
+        with self._lock:
+            self.latest_obs.update({f"{key}": rgb_data})
 
     def camera_info_sub_callback_template(self, msg: CameraInfo, camera_name: str):
         extrinsic_params = np.array(msg.P).reshape(3, 4)

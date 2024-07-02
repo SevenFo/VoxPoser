@@ -4,13 +4,13 @@ log_dir: ./logs/real_ros_quadcopter
 
 env:
   ros_params: !include ../envs/ros_env/params_local.yaml
-  workspace_bounds_min: [-2, 0, -1]
-  workspace_bounds_max: [2, 4, 2.1]
+  workspace_bounds_min: [-2, 0, -1.2]
+  workspace_bounds_max: [2, 4, 1.2]
   scene_target_objects: ['fire extinguisher']
-  description: "fly to the fire extinguisher"
+  description: "fly to the point 50cm above fire extinguisher"
 
 vlm:
-  input_shape: [3, 480, 640]
+  input_shape: [3, 720, 1280] # old camera input_shape: [3, 480, 640]
   batch_size: 1
 
 planner:
@@ -36,7 +36,6 @@ controller:
   mode: pose # pose, velocity
 
 visualizer:
-  save_dir: ./logs/real_ros_quadcopter/visualizations
   quality: low
   map_size: 100
 
@@ -46,6 +45,8 @@ lmp_config:
     num_waypoints_per_plan: 10000  # set to a large number since we only do open loop for sim
     max_plan_iter: 1
     visualize: True
+    detect_memory: True
+    execute_dynamic: True
   lmps:
     planner:
       prompt_fname: real_planner_prompt

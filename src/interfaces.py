@@ -326,6 +326,7 @@ class LMP_interface:
                 object_centric,
                 _plan_cond,
             ),
+            daemon=True,
         )
 
         # def signal_interrupt(signum, frame, cond, thread_handler):
@@ -364,9 +365,6 @@ class LMP_interface:
                 while True:
                     _plan_cond.acquire()
                     waypoint = self.traj_world[0]
-                    print(
-                        f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] current jraj: \n{self.traj_world}{bcolors.ENDC}"
-                    )
                     _plan_cond.release()
                     # execute one step
                     # TODO skip waypoint if moving to this point is going in opposite direction of the final target point
@@ -473,7 +471,6 @@ class LMP_interface:
                 _affordance_map = affordance_map()
                 _pre_avoidance_map = avoidance_map()
                 _velocity_map = velocity_map()
-                # TODO preprocess avoidance map, havent implemented yet
                 _avoidance_map = self._preprocess_avoidance_map(
                     _pre_avoidance_map, _affordance_map, movable_obs
                 )
