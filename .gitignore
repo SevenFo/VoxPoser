@@ -23,3 +23,4 @@ build/
 devel/
 *.mp4
 cache/
+*.whl

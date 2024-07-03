@@ -20,7 +20,7 @@ execute(movable, affordance_map=affordance_map)
 movable = parse_query_obj('quadcopter')
 affordance_map = get_affordance_map('a point 10cm above the yellow block')
 avoidance_map = get_avoidance_map('30cm near the mug')
-execute(movable, affordance_map=affordance_map, avoidance_map=get_avoidance_map)
+execute(movable, affordance_map=affordance_map, avoidance_map=avoidance_map)
 # done
 
 # Query: move to {a precise point}.

@@ -92,3 +92,47 @@ if type(env) == VoxPoserPyRepQuadcopterEnv:
     env._pyrep.stop()
     env._pyrep.shutdown()
 disp.stop()
+import os,re,time
+import engine_interfaces
+from yaml_config_utils import get_config, load_config
+
+def split_prompt(prompt):
+    if False:
+        pattern = r"(objects = .*?\n# Query:.*?(?:$|\n))"
+    else:
+        pattern = r"(\n# Query:.*?(?:$|\n))"
+    matches = re.split(pattern, prompt, flags=re.DOTALL)
+    return [matches[0] + "\n\n" + matches[1]] + matches[2:-1]
+
+prefix ="/shared/codes/VoxPoser"
+raw_prompt = ''
+with open(os.path.join(prefix,'src/prompts/pyrep_quadcopter/real_get_affordance_map_prompt.txt')) as f:
+    raw_prompt = f.read()
+descriptions = "fly to the table, then fly to the tree, and at last fly to the sofa"
+descriptions = "# Query: a point 10cm above the sky."
+user_prompt = raw_prompt + f"\n{descriptions}"
+splited_prompt = split_prompt(raw_prompt)
+    
+print(splited_prompt)
+tgi_config33 = load_config(
+    os.path.join(prefix,"src/configs/TGI_deepseek-coder-33B-instruct-AWQ.yaml")
+)
+ernieht_engine_config = load_config(os.path.join(prefix,"src/configs/ERNIEht.yaml"))
+engine_erniev4 = getattr(engine_interfaces, ernieht_engine_config["type"])(
+    **ernieht_engine_config
+)  # engine initialization
+
+_stop_tokens = ['# Query: ','objects = ','# done']
+temperature = 0.3
+use_cache = False
+max_tokens = 512
+
+engine_tgi_deepseek33 = getattr(engine_interfaces, tgi_config33["type"])(
+    **tgi_config33
+)  # engine initialization
+
+start_time = time.time()
+ret = engine_erniev4(prompt = (user_prompt,splited_prompt), stop = _stop_tokens, temperature = temperature, max_tokens = max_tokens, use_cache = use_cache)
+end_time = time.time()
+print(ret)
+print(f"time cost:{end_time-start_time}")

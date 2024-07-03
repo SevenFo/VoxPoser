@@ -16,11 +16,12 @@ import time
 from scipy.ndimage import distance_transform_edt
 import transforms3d
 import threading
-from controllers import Controller, SimpleQuadcopterController, SimpleROSController
+from controllers import Controller, SimpleQuadcopterController
+# from controllers import SimpleROSController
 from planners import PathPlanner
 
 from envs.pyrep_env.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
-from envs.ros_env.ros_env import VoxPoserROSDroneEnv
+# from envs.ros_env.ros_env import VoxPoserROSDroneEnv
 from envs.dummy_env import DummyEnv
 
 # creating some aliases for end effector and table in case LLMs refer to them differently (but rarely this happens)
@@ -52,7 +53,7 @@ TABLE_ALIAS = [
 class LMP_interface:
     def __init__(
         self,
-        env: Union[VoxPoserPyRepQuadcopterEnv, VoxPoserROSDroneEnv, DummyEnv],
+        env: Union[VoxPoserPyRepQuadcopterEnv],
         lmp_config,
         controller_config,
         planner_config,
@@ -68,7 +69,8 @@ class LMP_interface:
         if _controller_type == "SimpleQuadcopterController":
             self._controller = SimpleQuadcopterController(self._env, controller_config)
         elif _controller_type == "SimpleROSController":
-            self._controller = SimpleROSController(self._env, controller_config)
+            pass
+            # self._controller = SimpleROSController(self._env, controller_config)
         else:
             self._controller = Controller(self._env, controller_config)
         self.is_quad_env = True
@@ -978,14 +980,15 @@ def pc2voxel_map(points, voxel_bounds_robot_min, voxel_bounds_robot_max, map_siz
     # to integer
     _out = np.empty_like(voxel_xyz)
     if np.any(np.isnan(voxel_xyz)) or np.any(np.isinf(voxel_xyz)):
-        dump_file = f"./dumps/voxel_xyz_{get_clock_time(True)}.txt"
-        dump_file_replace = f"./dumps/voxel_xyz_replace_{get_clock_time(True)}.txt"
-        np.savetxt(dump_file, voxel_xyz)
-        print(
-            f"nan or inf in voxel_xyz, please check {dump_file}, we will replace them with numbers, please check {dump_file_replace}"
-        )
+        # dump_file = f"./dumps/voxel_xyz_{get_clock_time(True)}.txt"
+        # dump_file_replace = f"./dumps/voxel_xyz_replace_{get_clock_time(True)}.txt"
+        # np.savetxt(dump_file, voxel_xyz)
+        print("nan or inf detected")
+        # print(
+        #     f"nan or inf in voxel_xyz, please check {dump_file}, we will replace them with numbers, please check {dump_file_replace}"
+        # )
         voxel_xyz = np.nan_to_num(voxel_xyz, copy=True)
-        np.savetxt(dump_file_replace, voxel_xyz)
+        # np.savetxt(dump_file_replace, voxel_xyz)
     points_vox = np.round(voxel_xyz, 0, _out).astype(np.int32)
     voxel_map = np.zeros((map_size, map_size, map_size))
     for i in range(points_vox.shape[0]):

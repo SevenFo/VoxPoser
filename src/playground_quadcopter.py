@@ -10,7 +10,7 @@ from utils import set_lmp_objects
 import numpy as np
 import engine_interfaces
 from envs.pyrep_env.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
-from envs.ros_env.ros_env import VoxPoserROSDroneEnv
+# from envs.ros_env.ros_env import VoxPoserROSDroneEnv
 from engine_interfaces import Dummy
 from VLMPipline.VLM import VLM
 from VLMPipline.VLMM import VLMProcessWrapper

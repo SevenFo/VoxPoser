@@ -2,15 +2,26 @@ env_name: real_ros_quadcopter
 
 log_dir: ./logs/real_ros_quadcopter
 
+# env:
+#   ros_params: !include ../envs/ros_env/params_local.yaml
+#   workspace_bounds_min: [-2, 0, -1.2]
+#   workspace_bounds_max: [2, 4, 1.2]
+#   scene_target_objects: ['fire extinguisher']
+#   description: "fly to the point 50cm above fire extinguisher"
+
+# vlm:
+#   input_shape: [3, 720, 1280] # old camera input_shape: [3, 480, 640]
+#   batch_size: 1
+
 env:
   ros_params: !include ../envs/ros_env/params_local.yaml
-  workspace_bounds_min: [-2, 0, -1.2]
-  workspace_bounds_max: [2, 4, 1.2]
-  scene_target_objects: ['fire extinguisher']
-  description: "fly to the point 50cm above fire extinguisher"
+  workspace_bounds_min: [-3, 0, 0]
+  workspace_bounds_max: [3, 6, 3]
+  scene_target_objects: ["toy tank", "wooden house", "tree"]
+  description: "fly to the wooden house and keep at least 100cm away from the tree"
 
 vlm:
-  input_shape: [3, 720, 1280] # old camera input_shape: [3, 480, 640]
+  input_shape: [3, 480, 848] # old camera input_shape: [3, 480, 640]  [3, 720, 1280]
   batch_size: 1
 
 planner:

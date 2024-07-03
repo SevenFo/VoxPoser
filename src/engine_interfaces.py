@@ -125,6 +125,7 @@ class ERNIE:
         return response.json().get("access_token")
 
     def __call__(self, **kwds: Any) -> Any:
+        skip_cred = True
         assert "prompt" in kwds.keys(), "engine call kwargs not contain messages"
         prompt, splited_prompt = kwds["prompt"]
         assert (
@@ -186,15 +187,24 @@ class ERNIE:
 
         headers = {"Content-Type": "application/json"}
         try:
-            response = requests.request(
-                "POST",
-                self._url + self.get_access_token(),
-                headers=headers,
-                data=payload,
-            )
-            code_str = response.json()["result"]
-        except KeyError as e:
-            print("KeyError:", e)
+            if skip_cred:
+                response = requests.request(
+                    "POST",
+                    self._url,
+                    headers=headers,
+                    data=payload,
+                )
+                code_str = response.json()["result"]
+            else:
+                response = requests.request(
+                    "POST",
+                    self._url + self.get_access_token(),
+                    headers=headers,
+                    data=payload,
+                )
+                code_str = response.json()["result"]
+        except Exception as e:
+            print("Exception:", e)
             print(response.content)
             print(payload)
             exit(1)
@@ -306,8 +316,9 @@ class TGI:
                 data=payload,
             )
             code_str = response.json()["generated_text"]
-        except KeyError as e:
-            print("KeyError:", e)
+        except Exception as e:
+            print("Error:", e)
+            print(f'{self._url}/generate')
             print(response.content)
             print(payload)
             exit(1)
