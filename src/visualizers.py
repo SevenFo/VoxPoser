@@ -630,7 +630,10 @@ class ValueMapVisualizer:
         )
         if self.save_dir is not None:
             # TODO concurrent.futures
-            log_id = "plan_iter_" + str(plan_iter)
+            time = datetime.datetime.now()
+            log_id = f"{time.hour}-{time.minute}-{time.second}_plan_iter_" + str(
+                plan_iter
+            )
             save_path = os.path.join(self.save_dir, log_id + ".html")
             latest_save_path = os.path.join(self.save_dir, "latest.html")
             print("** saving visualization to", save_path, "...")

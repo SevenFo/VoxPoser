@@ -39,28 +39,6 @@ if __name__ == "__main__":
     #     "fire extinguisher",
     # ]
     env_config = get_config(config_path=config_path)
-    # vlmpipeline = VLM(
-    #     owlv2_model_path,
-    #     sam_model_path,
-    #     xmem_model_path,
-    #     resnet_18_path,
-    #     resnet_50_path,
-    #     verbose=False,
-    #     resize_to=[480, 480],
-    #     verbose_frame_every=1,
-    #     input_batch_size=5,
-    # )
-    # vlmpipeline = VLM(
-    #     owlv2_model_path,
-    #     sam_model_path,
-    #     xmem_model_path,
-    #     resnet_18_path,
-    #     resnet_50_path,
-    #     verbose=False,
-    #     resize_to=[640, 640],
-    #     verbose_frame_every=1,
-    #     input_batch_size=5,
-    # )
 
     log_dir = os.path.join(
         env_config.log_dir,
@@ -86,7 +64,7 @@ if __name__ == "__main__":
         verbose=False,
         verbose_frame_every=1,
         verbose_to_disk=True,
-        log_dir=env_config.log_dir,
+        log_dir=log_dir,
         input_batch_size=batch_size,
     )
     vlmpipeline.start()

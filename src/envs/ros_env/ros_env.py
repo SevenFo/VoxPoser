@@ -574,31 +574,29 @@ class VoxPoserROSDroneEnv:
             points, colors = self.get_scene_3d_obs(
                 ignore_robot=False, ignore_grasped_obj=False
             )
-            # points_filtered, _ = self.get_scene_3d_obs(
-            #     ignore_robot=False, ignore_grasped_obj=False, do_gaussian_filter=True
-            # )
             self.visualizer.update_scene_points(points, colors)
-            # self.visualizer.update_scene_points_filted(points_filtered, None)
-            fig = plt.figure(figsize=(6.4 * len(self.camera_names), 4.8))
-            for idx, cam in enumerate(self.camera_names):
-                rgb = self.snaped_obs[f"{cam}_rgb"]
-                mask = np.mod(self.latest_mask[cam], 256)  # avoid overflow for color
-                # trans np array to PIL image
-                self.visualizer.add_mask(cam, mask)
-                self.visualizer.add_rgb(cam, rgb)
-                # create a subfigure for each rgb frame
-                ax = fig.add_subplot(1, len(self.camera_names), idx + 1)
-                ax.imshow(rgb)
-                ax.imshow(mask, alpha=0.5, cmap="gray", vmin=0, vmax=255)
-                ax.set_title(cam)
-                # tight_layout会自动调整子图参数，使之填充整个图像区域
-                plt.tight_layout()
-            # trans fig to numpy array
-            fig.canvas.draw()
-            data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-            data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-            plt.close(fig)
-            self.visualizer.add_frame(data)
+
+            ## TODO code below takes too much time, use coroutine/concurrent.futures to speed up
+            # fig = plt.figure(figsize=(6.4 * len(self.camera_names), 4.8))
+            # for idx, cam in enumerate(self.camera_names):
+            #     rgb = self.snaped_obs[f"{cam}_rgb"]
+            #     mask = np.mod(self.latest_mask[cam], 256)  # avoid overflow for color
+            #     # trans np array to PIL image
+            #     self.visualizer.add_mask(cam, mask)
+            #     self.visualizer.add_rgb(cam, rgb)
+            #     # create a subfigure for each rgb frame
+            #     ax = fig.add_subplot(1, len(self.camera_names), idx + 1)
+            #     ax.imshow(rgb)
+            #     ax.imshow(mask, alpha=0.5, cmap="gray", vmin=0, vmax=255)
+            #     ax.set_title(cam)
+            #     # tight_layout会自动调整子图参数，使之填充整个图像区域
+            #     plt.tight_layout()
+            # # trans fig to numpy array
+            # fig.canvas.draw()
+            # data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+            # data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+
+            # self.visualizer.add_frame(data)
 
     def get_ee_pose(self):
         """
