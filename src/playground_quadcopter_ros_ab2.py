@@ -17,7 +17,7 @@ from VLMPipline.VLM import VLM
 from VLMPipline.VLMM import VLMProcessWrapper
 
 torch.set_grad_enabled(False)
-os.environ["ROS_MASTER_URI"] = "http://10.134.158.69:11311"
+os.environ["ROS_MASTER_URI"] = "http://10.134.159.107:11311"
 os.environ["ROS_IP"] = "10.134.159.154"
 
 if __name__ == "__main__":
@@ -69,13 +69,14 @@ if __name__ == "__main__":
         verbose=True,
         verbose_frame_every=1,
         verbose_to_disk=True,
-        log_dir=env_config.log_dir,
+        log_dir=log_dir,
         input_batch_size=batch_size,
     )
     vlmpipeline.start()
-    prefix = "/shared/codes/VoxPoser"
+    prefix = "/shared/codes/VoxPoser.worktrees/VoxPoser"
 
-    ollama_config = load_config(os.path.join(prefix, "src/configs/ollama_config.yaml"))
+    ollama_config = load_config(os.path.join(prefix, "src/configs/TGI_deepseek-coder-33B-instruct-AWQ.yaml"))
+    ollama_config = load_config(os.path.join(prefix, "src/configs/TGI_deepseek-coder-33B-instruct-AWQ.yaml"))
 
     engine_ollama_deepseek33_q4 = getattr(engine_interfaces, ollama_config["type"])(
         **ollama_config

@@ -267,45 +267,50 @@ class SimpleQuadcopterController:
 class SimpleROSController:
     def __init__(self, env: VoxPoserROSDroneEnv, config) -> None:
         assert (
-            type(env) == VoxPoserROSDroneEnv
+            type(env) is VoxPoserROSDroneEnv
         ), "env type should be VoxPoserROSDroneEnv"
         self.env = env
         self.mode = config.mode
         print(f"[controllers.py] using mode: {self.mode}")
 
-    def execute(self, movable_obs, waypoint, is_object_centric=False):
+    def execute(self, movable_obs, target, is_object_centric=False):
         """
-        execute a waypoint
-        If movable is "end effector", then do not consider object interaction (no dynamics considered)
-        If movable is "object", then consider object interaction (use heuristics-based dynamics model)
+        execute a waypoint or whole traj
 
         :param movable_obs: observation dict of the object to be moved
         :param waypoint: list, [target_xyz, target_rotation, target_velocity, target_gripper], target_xyz is for movable in world frame
         :param mode: str, "pose" or "velocity"
         :return: None
         """
-        info = dict()
-        (
-            target_xyz,
-            target_rotation,
-            target_velocity,
-            target_gripper,
-        ) = waypoint  # ignore target_rotation and target_waypoint
-        assert target_gripper is None and target_rotation is None
         object_centric = is_object_centric
-        # move to target pose directly
-        if not object_centric:
+        if object_centric:
+            raise NotImplementedError(
+                "not implement execute when movable is not qudacopter"
+            )
+        info = dict()
+        if self.mode != "traj":
+            (
+                target_xyz,
+                target_rotation,
+                target_velocity,
+                target_gripper,
+            ) = target  # ignore target_rotation and target_waypoint
+            assert target_gripper is None and target_rotation is None
+            # move to target pose directly
             if self.mode == "pose":
                 target_pose = np.concatenate([target_xyz, [0, 0, 0, 1]])
                 result = self.env.apply_action(target_pose)
             elif self.mode == "velocity":
                 result = self._execute_velocity(movable_obs, target_xyz)
-            info["mp_info"] = 0  # for success
         else:
-            raise NotImplementedError(
-                "not implement execute when movable is not qudacopter"
-            )
+            # traj
+            traj = target
+            result = self.env.apply_action(traj, mode="traj")
+        info["mp_info"] = 0  # for success
         return info
+
+    def is_finished(self):
+        return self.env.is_finished()
 
     def _execute_velocity(self, movable_obs, target_xyz):
         """

@@ -201,13 +201,14 @@ class LMP_interface:
         _hz: float = 0.03,
     ):
         plan_iter = 0
-        while self._enable_planning:
+        debug_traj_confirm = False
+        while self._enable_planning:  # TODO self._cfg["max_plan_iter"]
             # _plan_cond.acquire()
             # if self._enable_planning is False:
             #     _plan_cond.release()
             #     break
             print(
-                f"{bcolors.OKBLUE}[interfaces.py | _plan | {get_clock_time()}] start planning{bcolors.ENDC}"
+                f"{bcolors.OKBLUE}[interfaces.py | _plan | {get_clock_time()} | iter_{plan_iter}] start planning{bcolors.ENDC}"
             )
             self.movable_obs = movable_obs_func()
             self._affordance_map = affordance_map()
@@ -226,10 +227,10 @@ class LMP_interface:
                 self._avoidance_map,
                 object_centric=object_centric,
             )
-            plan_iter += 1
             print(
-                f"{bcolors.OKBLUE}[interfaces.py | _plan | {get_clock_time()}] planner time: {time.time() - start_time:.3f}s{bcolors.ENDC}"
+                f"{bcolors.OKBLUE}[interfaces.py | _plan | {get_clock_time()} | iter_{plan_iter}] planner time: {time.time() - start_time:.3f}s{bcolors.ENDC}"
             )
+            plan_iter += 1
             assert len(path_voxel) > 0, "path_voxel is empty"
             # convert voxel path to world trajectory, and include rotation, velocity, and gripper information
             traj_world = self._path2traj(
@@ -252,6 +253,9 @@ class LMP_interface:
                     planner_info["targets_voxel"]
                 )
                 self._env.visualizer.visualize_plan_result(info)
+            if not debug_traj_confirm:
+                input("wait for traj comfirmation")
+                debug_traj_confirm = True
             _plan_cond.notify()
             _plan_cond.wait(1 / _hz)
             print(
@@ -266,7 +270,7 @@ class LMP_interface:
         self.movable_obs = movable_obs_func()
         self._affordance_map = affordance_map_func()
         curr_pos = self.movable_obs.position
-        if distance_transform_edt(1 - self._affordance_map)[tuple(curr_pos)] <= 2:
+        if distance_transform_edt(1 - self._affordance_map)[tuple(curr_pos)] <= 12:
             print(
                 f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] reached target; terminating {bcolors.ENDC}"
             )
@@ -277,6 +281,93 @@ class LMP_interface:
             )
         # if not finish, then wait for the new traj to be planned
         return False
+
+    def _execute_wp_by_wp(self, movable_obs_func, affordance_map_func, _plan_cond):
+        """
+        # get traj from plan thread,
+        # execute one point -> check traj terminated -> check task terminated -> if not (continue traj or replan), if yes finished
+        """
+        # execute path
+        step_index = 0
+        while True:
+            _plan_cond.acquire()
+            waypoint = self.traj_world[0]
+            _plan_cond.release()
+
+            # execute one step
+            # TODO skip waypoint if moving to this point is going in opposite direction of the final target point
+            # (for example, if you have over-pushed an object, no need to move back)
+            controller_info = self._controller.execute(
+                movable_obs=movable_obs_func(), target=waypoint
+            )  # TODO check if the movement is finished as controller_info["mp_info"] not used
+
+            movable_obs = movable_obs_func()
+            _plan_cond.acquire()
+            dist2target = np.linalg.norm(
+                movable_obs["_position_world"] - self.traj_world[-1][0]
+            )
+            # execute results judgement, loggging
+            if controller_info["mp_info"] == -1:
+                print(
+                    f'{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] failed waypoint {step_index} \
+                        (wp: {waypoint[0].round(3)}, actual: {movable_obs["_position_world"].round(3)}, target: {self.traj_world[-1][0].round(3)}, \
+                            start: {self.traj_world[0][0].round(3)}, dist2target: {dist2target.round(3)}); mp info: {controller_info["mp_info"]}{bcolors.ENDC}'
+                )
+            else:
+                print(
+                    f'{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] completed waypoint {step_index} \
+                        (wp: {waypoint[0].round(3)}, actual: {movable_obs["_position_world"].round(3)}, target: {self.traj_world[-1][0].round(3)}, \
+                            start: {self.traj_world[0][0].round(3)}, dist2target: {dist2target.round(3)}){bcolors.ENDC}'
+                )
+            # reaching judgement, reach target -> clear all remained waypoints, not reach target -> pop the first waypoint
+            if (
+                dist2target <= 0.1
+            ):  # check for current trajectory, if the distance to the final target is less than 0.1
+                print(
+                    f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] close to the target point of this traj; remove all remained waypoints{bcolors.ENDC}"
+                )
+                self.traj_world.clear()
+            else:
+                self.traj_world.pop(0)
+            # check if replan is needed, details in _check_terminate
+            if self.traj_world == []:
+                print(
+                    f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] reached last waypoint; judge whether to terminate{bcolors.ENDC}"
+                )
+                if self._check_terminate(movable_obs_func, affordance_map_func):
+                    self._enable_planning = False
+                    _plan_cond.notify_all()
+                    _plan_cond.release()
+                    break
+                else:
+                    print(
+                        f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] have not reached target; waiting for new path to be planned{bcolors.ENDC}"
+                    )
+                    _plan_cond.notify()  # weak up planning thread
+                    _plan_cond.wait()
+            else:
+                _plan_cond.release()
+
+            time.sleep(0.01)  # sleep 0.01 seconds to release the GIL
+            step_index += 1
+
+    def _execute_waypoints(self, movable_obs_func, affordance_map_func, _plan_cond):
+        # 现在的问题在于：如果将任务是否完成交给下位机来判断，那他就只能判断路径是否完成，但不能判断任务是否完成
+        # 因此，上位机同时也应判断任务是否中止 TODO
+        task_finished = False
+        while not task_finished:
+            with _plan_cond:
+                traj = self.traj_world
+
+            controller_info = self._controller.execute(
+                movable_obs=None, target=traj
+            )  # 非阻塞调用，只是将路径发送给下位机，目前需要轮询查询是否完成 TODO
+
+            with _plan_cond: # TODO only plan once a time, so we need to lock here
+                while not self._controller.is_finished():
+                    time.sleep(0.01)
+
+            break
 
     def execute_quad_dynamic(
         self,
@@ -299,11 +390,13 @@ class LMP_interface:
           gripper_map: callable function that generates a 3D numpy array, the gripper voxel map, not used for quadricopter
         """
         print("[interface.py] calling execute")
-        assert gripper_map is None, "gripper_map is not used for quadricopter"
-        assert (
-            rotation_map is None
-        ), "rotation_map is not used for quadricopter as we havent implemented it"
         # initialize default voxel maps if not specified
+        if affordance_map is None:
+            affordance_map = self._get_default_voxel_map("affordance")
+        if gripper_map is None:
+            gripper_map = self._get_default_voxel_map("gripper")
+        if rotation_map is None:
+            rotation_map = self._get_default_voxel_map("rotation")
         if velocity_map is None:
             velocity_map = self._get_default_voxel_map("velocity")
         if avoidance_map is None:
@@ -330,94 +423,25 @@ class LMP_interface:
             daemon=True,
         )
 
-        # def signal_interrupt(signum, frame, cond, thread_handler):
-        #     self._enable_planning = False
-        #     cond.acquire()
-        #     cond.notify_all()
-        #     cond.release()
-        #     thread_handler.join()
-        #     exit(0)
-
-        # signal.signal(
-        #     signal.SIGINT,
-        #     lambda signum, frame: signal_interrupt(signum, frame, _plan_cond),
-        # )
-
         self.traj_world = []
         _plan_thread.setDaemon(True)
         _plan_thread.start()
         execute_info = []
+        if True:
+            low_level_execute_func = self._execute_waypoints
         if affordance_map is not None:
             # execute path in closed-loop
             print(f"[interface.py] max plan iter: {self._cfg['max_plan_iter']}")
-            for plan_iter in range(self._cfg["max_plan_iter"]):
-                print(f"[interface.py] plan iter: {plan_iter}")
-                print(
-                    f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] start executing path via controller){bcolors.ENDC}"
-                )
-                with _plan_cond:
-                    if len(self.traj_world) == 0:
-                        print(
-                            f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] waiting for path to be planned{bcolors.ENDC}"
-                        )
-                        _plan_cond.wait()
-                # execute path
-                step_index = 0
-                while True:
-                    _plan_cond.acquire()
-                    waypoint = self.traj_world[0]
-                    _plan_cond.release()
-                    # execute one step
-                    # TODO skip waypoint if moving to this point is going in opposite direction of the final target point
-                    # (for example, if you have over-pushed an object, no need to move back)
-                    controller_info = self._controller.execute(
-                        movable_obs=movable_obs_func(), waypoint=waypoint
-                    )  # TODO check if the movement is finished
-                    # loggging
-                    # reaching judgement
-                    movable_obs = movable_obs_func()
-                    _plan_cond.acquire()
-                    dist2target = np.linalg.norm(
-                        movable_obs["_position_world"] - self.traj_world[-1][0]
+            with _plan_cond:
+                if len(self.traj_world) == 0:
+                    print(
+                        f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] waiting for path to be planned{bcolors.ENDC}"
                     )
-                    if not object_centric and controller_info["mp_info"] == -1:
-                        print(
-                            f'{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] failed waypoint {step_index} (wp: {waypoint[0].round(3)}, actual: {movable_obs["_position_world"].round(3)}, target: {self.traj_world[-1][0].round(3)}, start: {self.traj_world[0][0].round(3)}, dist2target: {dist2target.round(3)}); mp info: {controller_info["mp_info"]}{bcolors.ENDC}'
-                        )
-                    else:
-                        print(
-                            f'{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] completed waypoint {step_index} (wp: {waypoint[0].round(3)}, actual: {movable_obs["_position_world"].round(3)}, target: {self.traj_world[-1][0].round(3)}, start: {self.traj_world[0][0].round(3)}, dist2target: {dist2target.round(3)}){bcolors.ENDC}'
-                        )
-                    if (
-                        dist2target <= 0.1
-                    ):  # check for current trajectory, if the distance to the final target is less than 0.1
-                        print(
-                            f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] close to the target point of this traj; remove all remained waypoints{bcolors.ENDC}"
-                        )
-                        self.traj_world.clear()
-                    else:
-                        self.traj_world.pop(0)
-                    if self.traj_world == []:
-                        print(
-                            f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] reached last waypoint; judge whether to terminate{bcolors.ENDC}"
-                        )
-                        if self._check_terminate(movable_obs_func, affordance_map):
-                            self._enable_planning = False
-                            _plan_cond.notify_all()
-                            _plan_cond.release()
-                            break
-                        else:
-                            print(
-                                f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] have not reached target; waiting for new path to be planned{bcolors.ENDC}"
-                            )
-                            _plan_cond.notify()  # weak up planning thread
-                            _plan_cond.wait()
-                    else:
-                        _plan_cond.release()
-                    time.sleep(0.01)  # sleep 0.01 seconds to release the GIL
-                    step_index += 1
-
-                break
+                    _plan_cond.wait()
+            print(
+                f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] start executing path via controller){bcolors.ENDC}"
+            )
+            low_level_execute_func(movable_obs_func, affordance_map, _plan_cond)
         print(
             f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] finished executing path via controller{bcolors.ENDC}"
         )

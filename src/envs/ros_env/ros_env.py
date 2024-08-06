@@ -9,9 +9,9 @@ import sensor_msgs.point_cloud2 as pl2
 from sensor_msgs.msg import CameraInfo, Image, PointCloud2, PointField
 from nav_msgs.msg import Odometry
 import tf2_ros
-import tf
 import tf2_geometry_msgs
 import tf2_sensor_msgs
+import tf.transformations
 import cv_bridge
 import numpy as np
 from VLMPipline.VLM import VLM
@@ -519,11 +519,12 @@ class VoxPoserROSDroneEnv:
             target_pose = tf2_geometry_msgs.do_transform_pose(target_pose, trans)
             goal = MoveBaseGoal()
             goal.target_pose = target_pose
-            # result = self._action_client.send_goal_and_wait(goal, rospy.Duration(30))
-            self._action_client.send_goal(goal)
-            while rospy.get_param("/fsm/drone_state") != 1:
-                rospy.loginfo_once("waiting for drone to reach the target position")
-                rospy.sleep(0.1)
+            rospy.loginfo_once("waiting for drone to reach the target position")
+            result = self._action_client.send_goal_and_wait(goal, rospy.Duration(300))
+            # self._action_client.send_goal(goal)
+            # while rospy.get_param("/fsm/drone_state") != 1:
+            # rospy.loginfo_once("waiting for drone to reach the target position")
+            # rospy.sleep(0.1)
             # if result != GoalStatus.SUCCEEDED:
             #     raise ValueError(f"the action {action} failed")
         elif mode == "velocity":
@@ -535,6 +536,21 @@ class VoxPoserROSDroneEnv:
             ), "the action should be [linear_x, linear_y, linear_z, angular_z]"
             self._cmd_pub.publish(Twist(Vector3(*action[:3]), Vector3(0, 0, action[3])))
             rospy.sleep(0.1) if not update_mask else None
+        elif mode == "traj":
+            traj = [a[0] for a in action]
+            rospy.loginfo(f"received traj in {self._world_frame_id} {traj}")
+            trans = self._tf_buffer.lookup_transform(
+                self._drone_frame_id,
+                self._world_frame_id,
+                rospy.Time(0),  # ????
+            )
+            traj = self._transform_traj(traj, trans)
+            rospy.loginfo(f"trans traj to {self._drone_frame_id} {traj}")
+            self._set_traj_to_params_server(traj)
+            rospy.loginfo_once("waiting for drone to finish traj")
+            # avoid blocking
+            # while rospy.get_param("/fsm/drone_state") != 1:
+            #     rospy.sleep(0.1)
         if update_mask:
             # masks = self.vlm.process_frame(self._get_rgb_frames(), verbose=True)
             masks = self.vlm.process_frame(self._get_rgb_frames())  # snap obs
@@ -556,6 +572,61 @@ class VoxPoserROSDroneEnv:
         self.latest_terminate = terminate  # TODO
         self._update_visualizer()
         return self.latest_obs, reward, terminate
+
+    def is_finished(self):
+        return rospy.get_param("/fsm/drone_state") == 1
+
+    def _transform_traj(self, traj, trans):
+        """
+        Applies a transformation to a trajectory.
+
+        Args:
+            traj (list): The input trajectory as a list of points.
+            trans (Transform): The transformation to apply.
+
+        Returns:
+            list: The transformed trajectory as a list of points.
+        """
+        # 提取平移和旋转信息
+        translation = trans.transform.translation
+        rotation = trans.transform.rotation
+
+        # 将旋转四元数转换为旋转矩阵
+        quaternion = [rotation.x, rotation.y, rotation.z, rotation.w]
+        rotation_matrix = tf.transformations.quaternion_matrix(quaternion)[0:3, 0:3]
+
+        # 构建4x4变换矩阵
+        transform_matrix = np.eye(4)
+        transform_matrix[0:3, 0:3] = rotation_matrix
+        transform_matrix[0:3, 3] = [translation.x, translation.y, translation.z]
+
+        # 对traj中的每个路径点应用变换
+        transformed_traj = []
+        for point in traj:
+            # 将路径点转换为齐次坐标形式
+            point_homogeneous = np.array([point[0], point[1], point[2], 1.0])
+            # 进行矩阵乘法
+            transformed_point_homogeneous = np.dot(transform_matrix, point_homogeneous)
+            # 提取转换后的点坐标
+            transformed_point = transformed_point_homogeneous[0:3]
+            transformed_traj.append(transformed_point.tolist())
+
+        return transformed_traj
+
+    def _set_traj_to_params_server(self, traj):
+        num_wp = len(traj)
+        prefix = "drone_0_ego_planner_node/fsm"
+        rospy.loginfo(f"params server prefix: {prefix}")
+        rospy.set_param(f"{prefix}/waypoint_num", num_wp)
+        rospy.loginfo(f"set {prefix}/waypoint_num: {num_wp}")
+        [
+            (rospy.set_param(f"{prefix}/waypoint{i}_{d}", value[j]), rospy.loginfo(f"set {prefix}/waypoint{i}_{d}: {value[j]}"))
+            for i, value in enumerate(traj)
+            for j, d in enumerate(["x", "y", "z"])
+        ]
+        rospy.set_param(
+            f"{prefix}/renew_goals", 1
+        )  # set flag to weak up lower controller
 
     def reset_to_default_pose(self):
         """
@@ -679,7 +750,8 @@ class VoxPoserROSDroneEnv:
             self.latest_obs.update({f"{key}": point})
 
     def rgb_image_sub_callback_template(self, msg: Image, key: str):
-        rgb_data = cv2.cvtColor(self._cvb.imgmsg_to_cv2(msg), cv2.COLOR_BGR2RGB)
+        # rgb_data = cv2.cvtColor(self._cvb.imgmsg_to_cv2(msg), cv2.COLOR_BGR2RGB)
+        rgb_data = self._cvb.imgmsg_to_cv2(msg)
         with self._lock:
             self.latest_obs.update({f"{key}": rgb_data})
 

@@ -32,9 +32,9 @@ composer(f"move to a point 100cm to the left of {current_position}")
 # done
 
 objects = ['table', 'cup']
-# Query: fly over the table and back
+# Query: fly over the cup and back
 controlled_object = parse_query_obj('controlled object')
 current_position = controlled_object.position # record the point I started
-composer("move to 100cm above the table")
+composer("move to 100cm above the cup")
 composer(f"move to {current_position}") # return to the place I started
 # done

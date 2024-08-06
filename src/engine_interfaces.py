@@ -318,7 +318,7 @@ class TGI:
             code_str = response.json()["generated_text"]
         except Exception as e:
             print("Error:", e)
-            print(f'{self._url}/generate')
+            print(f"{self._url}/generate")
             print(response.content)
             print(payload)
             exit(1)
@@ -372,11 +372,21 @@ class Ollama:
             len(splited_prompt) % 2 == 1
         ), f"len(splited_prompt)={len(splited_prompt)}, please ask assistant"
 
-        use_cache = False if ("use_cache" not in kwds or not self._load_cache) else kwds["use_cache"]
-        temperature = self._temperature if "temperature" not in kwds else kwds["temperature"]
-        model_instruction = self._model_instruction if "model_instruction" not in kwds else kwds["model_instruction"]
+        use_cache = (
+            False
+            if ("use_cache" not in kwds or not self._load_cache)
+            else kwds["use_cache"]
+        )
+        temperature = (
+            self._temperature if "temperature" not in kwds else kwds["temperature"]
+        )
+        model_instruction = (
+            self._model_instruction
+            if "model_instruction" not in kwds
+            else kwds["model_instruction"]
+        )
         stop_tokens = [] if "stop" not in kwds else kwds["stop"]
-        
+
         # Treat example codes as conversation history
         messages = []
         messages.append(

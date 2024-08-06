@@ -43,7 +43,7 @@ table = detect('table')[0]
 ret_val = table
 # done
 
-objects = ['quadcopter', 'green block', 'cup holder', 'black block'] # 怎么确定objects还是一个问题
+objects = ['quadcopter', 'green block', 'cup holder', 'black block'] 
 # Query: block.
 block = detect('green block')[0]
 ret_val = block
@@ -63,12 +63,12 @@ ret_val = None
 # done
 
 objects = ['anything not quadcopter', 'anything except quadcopter', 'whatever']
-# Query: quadcopter. # if query quadcopter, just detect it
+# Query: quadcopter. # if query quadcopter/controlled object or something like this, just call detect function to detect it and return the result
 quadcopter = detect('quadcopter')
 ret_val = quadcopter[0]
 # done
 
-objects = ['chair']
+objects = ['extinguisher', 'red block']
 # Query: quadcopter.
 quadcopter = detect('quadcopter')
 ret_val = quadcopter[0]

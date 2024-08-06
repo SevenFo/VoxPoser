@@ -14,14 +14,14 @@ log_dir: ./logs/real_ros_quadcopter
 #   batch_size: 1
 
 env:
-  ros_params: !include ../envs/ros_env/params_local.yaml
-  workspace_bounds_min: [-3, 0, 0]
-  workspace_bounds_max: [3, 6, 3]
-  scene_target_objects: ["toy tank", "wooden house", "tree"]
-  description: "fly to the wooden house and keep at least 100cm away from the tree"
+  ros_params: !include ../envs/ros_env/params_local_old_camera.yaml #!include ../envs/ros_env/params_local.yaml
+  workspace_bounds_min: [-2, 0, 0]
+  workspace_bounds_max: [2, 6, 2.0]
+  scene_target_objects: ["extinguisher", "toy tank", "wooden house", "tree"]
+  description: "fly to the point 80cm above extinguisher, than fly to the initial point" # "fly to the wooden house and keep at least 100cm away from the tree"
 
 vlm:
-  input_shape: [3, 480, 848] # old camera input_shape: [3, 480, 640]  [3, 720, 1280]
+  input_shape: [3, 480, 640] #[3, 480, 848] # old camera input_shape: [3, 480, 640]  [3, 720, 1280]
   batch_size: 1
 
 planner:
@@ -44,7 +44,7 @@ controller:
   num_samples: 10000
   ee_local: temperature
   e4_local_radius: 0.15
-  mode: pose # pose, velocity
+  mode: traj # pose, velocity, traj
 
 visualizer:
   quality: low

@@ -24,3 +24,4 @@ devel/
 *.mp4
 cache/
 *.whl
+VoxPoser.code-workspace
