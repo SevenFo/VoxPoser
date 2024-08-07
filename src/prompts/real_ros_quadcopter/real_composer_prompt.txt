@@ -36,3 +36,10 @@ tank = parse_query_obj('tank')
 diameter = np.min([max_x-min_x, max_y-min_y])
 affordance_map = get_affordance_map(f'a circle above the tank 30cm with a radius of {index2cm(diameter)}cm')
 # done
+
+# Query: move to {a precise point} while keep away from tree
+movable = parse_query_obj('quadcopter')
+affordance_map = get_affordance_map(f'a point at {a precise point}')
+avoidance_map = get_avoidance_map('50cm near the tree')
+execute(movable, affordance_map=affordance_map, avoidance_map=avoidance_map)
+# done

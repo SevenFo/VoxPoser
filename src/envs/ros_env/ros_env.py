@@ -750,8 +750,8 @@ class VoxPoserROSDroneEnv:
             self.latest_obs.update({f"{key}": point})
 
     def rgb_image_sub_callback_template(self, msg: Image, key: str):
-        # rgb_data = cv2.cvtColor(self._cvb.imgmsg_to_cv2(msg), cv2.COLOR_BGR2RGB)
-        rgb_data = self._cvb.imgmsg_to_cv2(msg)
+        # # rgb_data = cv2.cvtColor(self._cvb.imgmsg_to_cv2(msg), cv2.COLOR_BGR2RGB)
+        rgb_data = self._cvb.imgmsg_to_cv2(msg) ## RGB?? as encoding is passthrough ??
         with self._lock:
             self.latest_obs.update({f"{key}": rgb_data})
 

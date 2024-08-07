@@ -202,29 +202,29 @@ class LMP_interface:
     ):
         plan_iter = 0
         debug_traj_confirm = False
-        while self._enable_planning:  # TODO self._cfg["max_plan_iter"]
+        while not self._stop_planing.is_set():  # TODO self._cfg["max_plan_iter"]
             # _plan_cond.acquire()
-            # if self._enable_planning is False:
+            # if self._stop_planing is False:
             #     _plan_cond.release()
             #     break
             print(
                 f"{bcolors.OKBLUE}[interfaces.py | _plan | {get_clock_time()} | iter_{plan_iter}] start planning{bcolors.ENDC}"
             )
-            self.movable_obs = movable_obs_func()
-            self._affordance_map = affordance_map()
-            self._pre_avoidance_map = avoidance_map()
-            self._velocity_map = velocity_map()
-            self._avoidance_map = self._preprocess_avoidance_map(
-                self._pre_avoidance_map, self._affordance_map, self.movable_obs
+            movable_obs = movable_obs_func()
+            _affordance_map = affordance_map()
+            _pre_avoidance_map = avoidance_map()
+            _velocity_map = velocity_map()
+            _avoidance_map = self._preprocess_avoidance_map(
+                _pre_avoidance_map, _affordance_map, movable_obs
             )
             # start planning
-            start_pos = self.movable_obs["position"]
+            start_pos = movable_obs["position"]
             start_time = time.time()
             # optimize path and log
             path_voxel, planner_info = self._planner.optimize(
                 start_pos,
-                self._affordance_map,
-                self._avoidance_map,
+                _affordance_map,
+                _avoidance_map,
                 object_centric=object_centric,
             )
             print(
@@ -236,7 +236,7 @@ class LMP_interface:
             traj_world = self._path2traj(
                 path_voxel,
                 rotation_map=None,
-                velocity_map=self._velocity_map,
+                velocity_map=_velocity_map,
                 gripper_map=None,
             )  # we will get a list of tuple: (world_xyz, rotation, velocity, gripper)
             _plan_cond.acquire()
@@ -244,8 +244,8 @@ class LMP_interface:
             info = dict()
             if self._cfg["visualize"]:
                 info["planner_info"] = planner_info
-                info["traj_world"] = self.traj_world
-                info["movable_obs"] = self.movable_obs
+                info["traj_world"] = traj_world
+                info["movable_obs"] = movable_obs
                 info["plan_iter"] = plan_iter
                 info["start_pos"] = start_pos
                 info["start_pos_world"] = self._voxel_to_world(start_pos)
@@ -256,6 +256,10 @@ class LMP_interface:
             if not debug_traj_confirm:
                 input("wait for traj comfirmation")
                 debug_traj_confirm = True
+            else:
+                print(
+                    f"{bcolors.OKBLUE}[interfaces.py | _plan | {get_clock_time()} | iter_{plan_iter}] traj auto comfirmated!{bcolors.ENDC}"
+                )
             _plan_cond.notify()
             _plan_cond.wait(1 / _hz)
             print(
@@ -267,17 +271,17 @@ class LMP_interface:
 
     def _check_terminate(self, movable_obs_func, affordance_map_func):
         # get the latest observation
-        self.movable_obs = movable_obs_func()
-        self._affordance_map = affordance_map_func()
-        curr_pos = self.movable_obs.position
-        if distance_transform_edt(1 - self._affordance_map)[tuple(curr_pos)] <= 12:
+        movable_obs = movable_obs_func()
+        _affordance_map = affordance_map_func()
+        curr_pos = movable_obs.position
+        if distance_transform_edt(1 - _affordance_map)[tuple(curr_pos)] <= 12:
             print(
                 f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] reached target; terminating {bcolors.ENDC}"
             )
             return True
         else:
             print(
-                f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] have not reached target; dist: {distance_transform_edt(1 - self._affordance_map)[tuple(curr_pos)]}{bcolors.ENDC}"
+                f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] have not reached target; dist: {distance_transform_edt(1 - _affordance_map)[tuple(curr_pos)]}{bcolors.ENDC}"
             )
         # if not finish, then wait for the new traj to be planned
         return False
@@ -335,7 +339,7 @@ class LMP_interface:
                     f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] reached last waypoint; judge whether to terminate{bcolors.ENDC}"
                 )
                 if self._check_terminate(movable_obs_func, affordance_map_func):
-                    self._enable_planning = False
+                    self._stop_planing.set()
                     _plan_cond.notify_all()
                     _plan_cond.release()
                     break
@@ -351,7 +355,7 @@ class LMP_interface:
             time.sleep(0.01)  # sleep 0.01 seconds to release the GIL
             step_index += 1
 
-    def _execute_waypoints(self, movable_obs_func, affordance_map_func, _plan_cond):
+    def _execute_waypoints(self, movable_obs_func, affordance_map_func, _plan_cond: threading.Condition):
         # 现在的问题在于：如果将任务是否完成交给下位机来判断，那他就只能判断路径是否完成，但不能判断任务是否完成
         # 因此，上位机同时也应判断任务是否中止 TODO
         task_finished = False
@@ -366,7 +370,12 @@ class LMP_interface:
             with _plan_cond: # TODO only plan once a time, so we need to lock here
                 while not self._controller.is_finished():
                     time.sleep(0.01)
-
+                # terminate plan thread
+                print(
+                    f"{bcolors.WARNING}[interfaces.py | {get_clock_time()}] start exiting plan thread{bcolors.ENDC}"
+                )
+                self._stop_planing.set()
+                _plan_cond.notify_all()
             break
 
     def execute_quad_dynamic(
@@ -391,17 +400,17 @@ class LMP_interface:
         """
         print("[interface.py] calling execute")
         # initialize default voxel maps if not specified
-        if affordance_map is None:
+        if not affordance_map :
             affordance_map = self._get_default_voxel_map("affordance")
-        if gripper_map is None:
+        if not gripper_map :
             gripper_map = self._get_default_voxel_map("gripper")
-        if rotation_map is None:
+        if not rotation_map :
             rotation_map = self._get_default_voxel_map("rotation")
-        if velocity_map is None:
+        if not velocity_map :
             velocity_map = self._get_default_voxel_map("velocity")
-        if avoidance_map is None:
+        if not avoidance_map :
             avoidance_map = self._get_default_voxel_map("obstacle")
-        self._enable_planning: bool = True
+        self._stop_planing = threading.Event()
         _plan_cond = threading.Condition()
 
         object_centric = (
@@ -446,6 +455,10 @@ class LMP_interface:
             f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] finished executing path via controller{bcolors.ENDC}"
         )
         self._env.visualizer.save_gifs()
+        _plan_thread.join()
+        print(
+            f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] plan thread has exited{bcolors.ENDC}"
+        )
         return execute_info
 
     def execute_quad(
@@ -837,7 +850,7 @@ class LMP_interface:
         return traj
 
     def _preprocess_avoidance_map(self, avoidance_map, affordance_map, movable_obs):
-        # # collision avoidance
+        # # collision avoidance 但是注意不到后面的点云!!
         scene_collision_map = self._get_scene_collision_voxel_map()
         # anywhere within 10/100 indices of the target is ignored (to guarantee that we can reach the target)
         ignore_mask = distance_transform_edt(1 - affordance_map)
@@ -864,7 +877,7 @@ class LMP_interface:
         return avoidance_map
 
 
-def setup_LMP(env, general_config, debug=False, engine_call_fn=None):
+def setup_LMP(env, general_config, debug=False, engine_call_fn=None, log_dir = "./"):
     controller_config = general_config["controller"]
     planner_config = general_config["planner"]
     lmp_env_config = general_config["lmp_config"]["env"]
@@ -914,6 +927,7 @@ def setup_LMP(env, general_config, debug=False, engine_call_fn=None):
             debug,
             env_name,
             engine_call_fn=engine_call_fn,
+            log_dir=log_dir
         )
         for k in lmp_names
     }
@@ -928,6 +942,7 @@ def setup_LMP(env, general_config, debug=False, engine_call_fn=None):
         debug,
         env_name,
         engine_call_fn=engine_call_fn,
+        log_dir=log_dir
     )
     variable_vars["composer"] = composer
 
@@ -940,6 +955,7 @@ def setup_LMP(env, general_config, debug=False, engine_call_fn=None):
         debug,
         env_name,
         engine_call_fn=engine_call_fn,
+        log_dir=log_dir
     )
 
     lmps = {
