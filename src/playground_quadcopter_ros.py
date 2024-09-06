@@ -28,16 +28,7 @@ if __name__ == "__main__":
     resnet_50_path = "/models/resnet50.pth"
     config_path = "./src/configs/pyrep_quadcopter.yaml"
     config_path = "./src/configs/airsim_ros_quadcopter.yaml"
-    scene_target_objects = [
-        "pumpkin",
-        "house",
-        "apple",
-        "Stone lion statue",
-        "windmill",
-    ]
-    # scene_target_objects = [
-    #     "fire extinguisher",
-    # ]
+
     env_config = get_config(config_path=config_path)
 
     log_dir = os.path.join(
@@ -69,13 +60,20 @@ if __name__ == "__main__":
     )
     vlmpipeline.start()
 
-    prefix = "/shared/codes/VoxPoser"
+    prefix = "/shared/codes/VoxPoser.worktrees/VoxPoser"
 
     ollama_config = load_config(os.path.join(prefix, "src/configs/ollama_config.yaml"))
 
     engine_ollama_deepseek33_q4 = getattr(engine_interfaces, ollama_config["type"])(
         **ollama_config
     )
+    tgi_config = load_config(
+        os.path.join(prefix, "src/configs/TGI_deepseek-coder-33B-instruct-AWQ.yaml")
+    )
+
+    tgi = getattr(engine_interfaces, tgi_config["type"])(**tgi_config)
+    tgi = getattr(engine_interfaces, tgi_config["type"])(**tgi_config)
+
     visualizer = ValueMapVisualizer(env_config["visualizer"])
 
     env = VoxPoserROSDroneEnv(
@@ -84,21 +82,12 @@ if __name__ == "__main__":
         target_objects=scene_target_objects,
         configs=env_config.env,
     )
-
+    input("waiting for start!")
     descriptions, obs = env.reset()
-    # descriptions = "fly to the table, then fly to the tree, and at last fly to the sofa"
-    descriptions = (
-        "fly to the house, then fly to the point where you started"  # checked
-    )
-    # descriptions = "fly to the fire extinguisher"  # "  # underchecking
-    # descriptions = "fly forward 100cm"
-    # descriptions = "fly forward 100cm, then fly to the Stone lion statue, and at last fly backward 300cm" # underchecking
     if "description" in env_config.env:
         descriptions = env_config.env["description"]
 
-    lmps, lmp_env = setup_LMP(
-        env, env_config, debug=False, engine_call_fn=engine_ollama_deepseek33_q4
-    )
+    lmps, lmp_env = setup_LMP(env, env_config, debug=False, engine_call_fn=tgi)
     voxposer_ui = lmps["plan_ui"]
     set_lmp_objects(lmps, env.get_object_names())
     # try:

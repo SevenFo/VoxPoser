@@ -25,3 +25,7 @@ devel/
 cache/
 *.whl
 VoxPoser.code-workspace
+*.png
+*.xyz
+*.pdf
+*.gv

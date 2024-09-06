@@ -6,6 +6,8 @@ env:
   workspace_bounds_min: [0, 0, 0]
   workspace_bounds_max: [5, 5, 3]
   ros_params: !include ../envs/ros_env/params_airsim.yaml
+  scene_target_objects: ["pumpkin","house","apple","Stone lion statue","windmill"]
+  description: "fly to the house, then fly to the point where you started" # "fly to the wooden house and keep at least 100cm away from the tree"
 
 vlm:
   input_shape: [3, 640, 640]

@@ -242,6 +242,9 @@ class TGI:
         self._cache_dir_base = os.path.join(
             self._cache_root_dir, self._full_name, get_clock_time()
         )
+        self._cache_dir_base = os.path.join(
+            self._cache_root_dir, self._full_name, "persistent"
+        )
         if self._load_cache and not os.path.exists(self._cache_dir_base):
             os.makedirs(self._cache_dir_base)
         self._cache = DiskCache(
@@ -303,7 +306,9 @@ class TGI:
         )
         payload = json.dumps({"inputs": inputs, "parameters": parameters})
         headers = {"Content-Type": "application/json"}
-        cache_key = {f"{self._full_name}": payload}
+        # cache_key = {f"{self._full_name}": splited_prompt[-1]}
+        cache_key = splited_prompt[-1]
+        print(f"cache_key: {cache_key}")
         if use_cache:
             if cache_key in self._cache:
                 print("(using cache)", end=" ")
@@ -333,6 +338,7 @@ class TGI:
         # whatever caching the result
         if self._load_cache:
             self._cache[cache_key] = ret
+            print(f"cached {cache_key}")
         return ret
 
 

@@ -355,7 +355,9 @@ class LMP_interface:
             time.sleep(0.01)  # sleep 0.01 seconds to release the GIL
             step_index += 1
 
-    def _execute_waypoints(self, movable_obs_func, affordance_map_func, _plan_cond: threading.Condition):
+    def _execute_waypoints(
+        self, movable_obs_func, affordance_map_func, _plan_cond: threading.Condition
+    ):
         # 现在的问题在于：如果将任务是否完成交给下位机来判断，那他就只能判断路径是否完成，但不能判断任务是否完成
         # 因此，上位机同时也应判断任务是否中止 TODO
         task_finished = False
@@ -367,7 +369,7 @@ class LMP_interface:
                 movable_obs=None, target=traj
             )  # 非阻塞调用，只是将路径发送给下位机，目前需要轮询查询是否完成 TODO
 
-            with _plan_cond: # TODO only plan once a time, so we need to lock here
+            with _plan_cond:  # TODO only plan once a time, so we need to lock here
                 while not self._controller.is_finished():
                     time.sleep(0.01)
                 # terminate plan thread
@@ -400,15 +402,15 @@ class LMP_interface:
         """
         print("[interface.py] calling execute")
         # initialize default voxel maps if not specified
-        if not affordance_map :
+        if not affordance_map:
             affordance_map = self._get_default_voxel_map("affordance")
-        if not gripper_map :
+        if not gripper_map:
             gripper_map = self._get_default_voxel_map("gripper")
-        if not rotation_map :
+        if not rotation_map:
             rotation_map = self._get_default_voxel_map("rotation")
-        if not velocity_map :
+        if not velocity_map:
             velocity_map = self._get_default_voxel_map("velocity")
-        if not avoidance_map :
+        if not avoidance_map:
             avoidance_map = self._get_default_voxel_map("obstacle")
         self._stop_planing = threading.Event()
         _plan_cond = threading.Condition()
@@ -436,8 +438,10 @@ class LMP_interface:
         _plan_thread.setDaemon(True)
         _plan_thread.start()
         execute_info = []
-        if True:
+        if False:
             low_level_execute_func = self._execute_waypoints
+        else:
+            low_level_execute_func = self._execute_wp_by_wp
         if affordance_map is not None:
             # execute path in closed-loop
             print(f"[interface.py] max plan iter: {self._cfg['max_plan_iter']}")
@@ -482,10 +486,10 @@ class LMP_interface:
           gripper_map: callable function that generates a 3D numpy array, the gripper voxel map, not used for quadricopter
         """
         print("[interface.py] calling execute")
-        assert gripper_map is None, "gripper_map is not used for quadricopter"
-        assert (
-            rotation_map is None
-        ), "rotation_map is not used for quadricopter as we havent implemented it"
+        # assert gripper_map is None, "gripper_map is not used for quadricopter"
+        # assert (
+        #     rotation_map is None
+        # ), "rotation_map is not used for quadricopter as we havent implemented it"
         # initialize default voxel maps if not specified
         if velocity_map is None:
             velocity_map = self._get_default_voxel_map("velocity")
@@ -877,7 +881,7 @@ class LMP_interface:
         return avoidance_map
 
 
-def setup_LMP(env, general_config, debug=False, engine_call_fn=None, log_dir = "./"):
+def setup_LMP(env, general_config, debug=False, engine_call_fn=None, log_dir="./"):
     controller_config = general_config["controller"]
     planner_config = general_config["planner"]
     lmp_env_config = general_config["lmp_config"]["env"]
@@ -927,7 +931,7 @@ def setup_LMP(env, general_config, debug=False, engine_call_fn=None, log_dir = "
             debug,
             env_name,
             engine_call_fn=engine_call_fn,
-            log_dir=log_dir
+            log_dir=log_dir,
         )
         for k in lmp_names
     }
@@ -942,7 +946,7 @@ def setup_LMP(env, general_config, debug=False, engine_call_fn=None, log_dir = "
         debug,
         env_name,
         engine_call_fn=engine_call_fn,
-        log_dir=log_dir
+        log_dir=log_dir,
     )
     variable_vars["composer"] = composer
 
@@ -955,7 +959,7 @@ def setup_LMP(env, general_config, debug=False, engine_call_fn=None, log_dir = "
         debug,
         env_name,
         engine_call_fn=engine_call_fn,
-        log_dir=log_dir
+        log_dir=log_dir,
     )
 
     lmps = {
