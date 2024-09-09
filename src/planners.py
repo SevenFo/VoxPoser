@@ -217,7 +217,7 @@ class PathPlanner:
             k = self.config["pushing_skip_per_k"]
             path = np.concatenate([path[k:-1:k], path[-1:]])
         # skip waypoints to reduce path length
-        if "pick_per_k" in self.config:
+        if "pick_per_k" in self.config and self.config["pick_per_k"]:
             print(f"[planners.py | {get_clock_time(milliseconds=True)}] before pick per k; path length: {len(path)}")
             pick_per_k = self.config["pick_per_k"]
             # pick every pick_ratio-th waypoint

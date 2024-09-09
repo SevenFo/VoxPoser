@@ -3,69 +3,78 @@ from perception_utils import detect
 
 objects = ['green block', 'cardboard box']
 # Query: gripper.
-gripper = detect('gripper')
+gripper = detect('gripper')[0]
 ret_val = gripper
+# done
 
 objects = ['handle1', 'handle2', 'egg1', 'egg2', 'plate']
 # Query: topmost handle.
-handle1 = detect('handle1')
-handle2 = detect('handle2')
+handle1 = detect('handle1')[0]
+handle2 = detect('handle2')[0]
 if handle1.position[2] > handle2.position[2]:
     top_handle = handle1
 else:
     top_handle = handle2
 ret_val = top_handle
+# done
 
 objects = ['vase', 'napkin box', 'mask']
 # Query: table.
-table = detect('table')
+table = detect('table')[0]
 ret_val = table
+# done
 
 objects = ['brown line', 'red block', 'monitor']
 # Query: brown line.
-brown_line = detect('brown line')
+brown_line = detect('brown line')[0]
 ret_val = brown_line
+# done
 
 objects = ['green block', 'cup holder', 'black block']
 # Query: any block.
-block = detect('green block')
+block = detect('green block')[0]
 ret_val = block
+# done
 
 objects = ['mouse', 'yellow bowl', 'brown bowl', 'sticker']
 # Query: bowl closest to the sticker.
-yellow_bowl = detect('yellow bowl')
-brown_bowl = detect('brown bowl')
-sticker = detect('sticker')
+yellow_bowl = detect('yellow bowl')[0]
+brown_bowl = detect('brown bowl')[0]
+sticker = detect('sticker')[0]
 if np.linalg.norm(yellow_bowl.position - sticker.position) < np.linalg.norm(brown_bowl.position - sticker.position):
     closest_bowl = yellow_bowl
 else:
     closest_bowl = brown_bowl
 ret_val = closest_bowl
+# done
 
 objects = ['grape', 'wood tray', 'strawberry', 'white tray', 'blue tray', 'bread']
 # Query: tray that contains the bread.
-wood_tray = detect('wood tray')
-white_tray = detect('white tray')
-bread = detect('bread')
+wood_tray = detect('wood tray')[0]
+white_tray = detect('white tray')[0]
+bread = detect('bread')[0]
 if np.linalg.norm(wood_tray.position - bread.position) < np.linalg.norm(white_tray.position - bread.position):
     tray_with_bread = wood_tray
 else:
     tray_with_bread = white_tray
 ret_val = tray_with_bread
+# done
 
 objects = ['glass', 'vase', 'plastic bottle', 'block', 'phone case']
 # Query: anything fragile.
 fragile_items = []
 for obj in ['glass', 'vase']:
-    item = detect(obj)
+    item = detect(obj)[0]
     fragile_items.append(item)
 ret_val = fragile_items
+# done
 
 objects = ['blue block', 'red block']
 # Query: green block.
 ret_val = None
+# done
 
 objects = ['cup', 'object_not_gripper']
 # Query: gripper.
-gripper = detect('gripper')
-ret_val = gripper
+gripper = detect('gripper')[0]
+ret_val = gripper# done

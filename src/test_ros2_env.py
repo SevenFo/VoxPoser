@@ -10,13 +10,13 @@ import engine_interfaces
 from envs.ros_env.ros2_env import VoxPoserROS2MPEnv
 from VLMPipline.VLMM import VLMProcessWrapper
 from interfaces import setup_LMP
+from utils import set_lmp_objects
+
 torch.set_grad_enabled(False)
 os.environ["ROS_MASTER_URI"] = "http://localhost:11311"
 # os.environ["ROS_IP"] = ""
 
 if __name__ == "__main__":
-    disp = Display(visible=False, size=(1920, 1080))
-    disp.start()
     # vlm config
     owlv2_model_path = "/root/models/google-owlv2-large-patch14-finetuned"
     owlv2_model_path = "/root/models/google-owlv2-base-patch16-ensemble"
@@ -83,3 +83,5 @@ if __name__ == "__main__":
         env, env_config, debug=False, engine_call_fn=engine_ollama_deepseek33_q4
     )
     voxposer_ui = lmps["plan_ui"]
+    set_lmp_objects(lmps, env.get_object_names())
+    voxposer_ui(descriptions)

@@ -16,12 +16,10 @@ import time
 from scipy.ndimage import distance_transform_edt
 import transforms3d
 import threading
-from controllers import Controller, SimpleQuadcopterController, SimpleROSController
+from controllers import Controller
 from planners import PathPlanner
 
-from envs.pyrep_env.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
 
-from envs.ros_env.ros_env import VoxPoserROSDroneEnv
 from envs.dummy_env import DummyEnv
 
 # creating some aliases for end effector and table in case LLMs refer to them differently (but rarely this happens)
@@ -53,7 +51,7 @@ TABLE_ALIAS = [
 class LMP_interface:
     def __init__(
         self,
-        env: Union[VoxPoserPyRepQuadcopterEnv, VoxPoserROSDroneEnv, DummyEnv],
+        env,
         lmp_config,
         controller_config,
         planner_config,
@@ -66,12 +64,7 @@ class LMP_interface:
         self._planner = PathPlanner(planner_config, map_size=self._map_size)
         self._latest_obs_results = {}
         _controller_type = controller_config["type"]
-        if _controller_type == "SimpleQuadcopterController":
-            self._controller = SimpleQuadcopterController(self._env, controller_config)
-        elif _controller_type == "SimpleROSController":
-            self._controller = SimpleROSController(self._env, controller_config)
-        else:
-            self._controller = Controller(self._env, controller_config)
+        self._controller = Controller(self._env, controller_config)
         self.is_quad_env = True
         # calculate size of each voxel (resolution)
         self._resolution = (
@@ -112,7 +105,7 @@ class LMP_interface:
                 rotation_map,
                 gripper_map,
             )
-        return self.execute_quad(
+        return self.execute_arm(
             movable_obs_func,
             affordance_map,
             avoidance_map,

@@ -243,7 +243,7 @@ class TGI:
             self._cache_root_dir, self._full_name, get_clock_time()
         )
         self._cache_dir_base = os.path.join(
-            self._cache_root_dir, self._full_name, "persistent"
+            self._cache_root_dir, self._full_name, "persistent_arm"
         )
         if self._load_cache and not os.path.exists(self._cache_dir_base):
             os.makedirs(self._cache_dir_base)

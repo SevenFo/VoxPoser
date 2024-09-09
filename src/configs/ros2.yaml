@@ -15,8 +15,8 @@ log_dir: ./logs/ros2
 
 env:
   ros_params: !include ../envs/ros_env/params_ros2.yaml #!include ../envs/ros_env/params_local.yaml
-  workspace_bounds_min: [-2, 0, 0]
-  workspace_bounds_max: [2, 6, 2.0]
+  workspace_bounds_min: [-0.1, -0.5, 0]
+  workspace_bounds_max: [1.0, 0.5, 1.0]
   scene_target_objects: ["pop can", "toy tank", "wooden house", "tree"]
   description: "pick up the pop can" # "fly to the wooden house and keep at least 100cm away from the tree"
 
@@ -36,7 +36,7 @@ planner:
   target_spacing: 1
   max_curvature: 3
   pushing_skip_per_k: 5
-  pick_per_k: 5
+  pick_per_k: 2
 
 controller:
   type: SimpleROSController
@@ -56,8 +56,8 @@ lmp_config:
     num_waypoints_per_plan: 10000  # set to a large number since we only do open loop for sim
     max_plan_iter: 1
     visualize: True
-    detect_memory: True
-    execute_dynamic: True
+    detect_memory: False
+    execute_dynamic: False
   lmps:
     planner:
       prompt_fname: real_planner_prompt
@@ -76,7 +76,7 @@ lmp_config:
       return_val_name: ret_val
       load_cache: True
     composer:
-      prompt_fname: real_composer_prompt
+      prompt_fname: real_composer_prompt_short
       model: Dummy
       max_tokens: 512
       temperature: 0.3
@@ -155,19 +155,35 @@ lmp_config:
       has_return: True
       return_val_name: ret_val
       load_cache: True
-    # get_rotation_map:
-    #   prompt_fname: real_get_rotation_map_prompt
-    #   model: Dummy
-    #   max_tokens: 512
-    #   temperature: 0.3
-    #   query_prefix: '# Query: '
-    #   query_suffix: '.'
-    #   stop:
-    #     - '# Query: '
-    #     - 'objects =        
-    #     - '# done'
-    #   maintain_session: False
-    #   include_context: False
-    #   has_return: True
-    #   return_val_name: ret_val
-    #   load_cache: True
+    get_rotation_map:
+      prompt_fname: real_get_rotation_map_prompt
+      model: Dummy
+      max_tokens: 512
+      temperature: 0.3
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: False
+      include_context: False
+      has_return: True
+      return_val_name: ret_val
+      load_cache: True
+    get_gripper_map:
+      prompt_fname: real_get_gripper_map_prompt
+      model: Dummy
+      max_tokens: 512
+      temperature: 0.3
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: False
+      include_context: False
+      has_return: True
+      return_val_name: ret_val
+      load_cache: True

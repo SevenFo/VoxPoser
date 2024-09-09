@@ -10,6 +10,7 @@ from moveit_configs_utils import MoveItConfigsBuilder
 
 
 def generate_launch_description():
+    use_sim_time = LaunchConfiguration('use_sim_time', default='true')
 
     # Command-line arguments
     ros2_control_hardware_type = DeclareLaunchArgument(
@@ -29,7 +30,11 @@ def generate_launch_description():
             },
         )
         .robot_description_semantic(file_path="config/panda.srdf")
+        .robot_description_kinematics(file_path="config/kinematics.yaml")
         .trajectory_execution(file_path="config/gripper_moveit_controllers.yaml")
+        .planning_scene_monitor(
+            publish_robot_description=True, publish_robot_description_semantic=True
+        )
         .planning_pipelines(pipelines=["ompl", "pilz_industrial_motion_planner"])
         .to_moveit_configs()
     )
@@ -39,13 +44,13 @@ def generate_launch_description():
         package="moveit_ros_move_group",
         executable="move_group",
         output="screen",
-        parameters=[moveit_config.to_dict()],
+        parameters=[moveit_config.to_dict(),{'use_sim_time':use_sim_time}],
         arguments=["--ros-args", "--log-level", "info"],
     )
 
     # RViz
     # rviz_config_file = os.path.join(
-    #     get_package_share_directory("moveit2_tutorials"),
+    #     "./",
     #     "config",
     #     "panda_moveit_config.rviz",
     # )
@@ -71,6 +76,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="static_transform_publisher",
         output="log",
+        parameters=[{'use_sim_time':use_sim_time}],
         arguments=["--frame-id", "world", "--child-frame-id", "panda_link0"],
     )
     hand2camera_tf_node = Node(
@@ -78,6 +84,7 @@ def generate_launch_description():
         executable="static_transform_publisher",
         name="static_transform_publisher",
         output="log",
+        parameters=[{'use_sim_time':use_sim_time}],
         arguments=[
             "0.04",
             "0.0",
@@ -96,7 +103,7 @@ def generate_launch_description():
         executable="robot_state_publisher",
         name="robot_state_publisher",
         output="both",
-        parameters=[moveit_config.robot_description],
+        parameters=[moveit_config.robot_description,{'use_sim_time':use_sim_time}],
     )
 
     # ros2_control using FakeSystem as hardware
@@ -108,7 +115,7 @@ def generate_launch_description():
     ros2_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[ros2_controllers_path],
+        parameters=[ros2_controllers_path,{'use_sim_time':use_sim_time}],
         remappings=[
             ("/controller_manager/robot_description", "/robot_description"),
         ],
@@ -118,6 +125,7 @@ def generate_launch_description():
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
+        parameters=[{'use_sim_time':use_sim_time}],
         arguments=[
             "joint_state_broadcaster",
             "--controller-manager",
@@ -128,12 +136,14 @@ def generate_launch_description():
     panda_arm_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
+        parameters=[{'use_sim_time':use_sim_time}],
         arguments=["panda_arm_controller", "-c", "/controller_manager"],
     )
 
     panda_hand_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
+        parameters=[{'use_sim_time':use_sim_time}],
         arguments=["panda_hand_controller", "-c", "/controller_manager"],
     )
 

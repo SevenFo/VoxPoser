@@ -29,3 +29,5 @@ VoxPoser.code-workspace
 *.xyz
 *.pdf
 *.gv
+install/
+log/

@@ -1,0 +1,11 @@
+# Goal
+float64[7] pose_goal  # 7 values: x, y, z, x, y, z, w (pose quaternion)
+int32 gripper_state   # 1 for open, 0 for close
+
+---
+# Result
+bool success  # True if the move and gripper operation was successful
+
+---
+# Feedback (optional)
+string feedback  # Feedback message, if needed

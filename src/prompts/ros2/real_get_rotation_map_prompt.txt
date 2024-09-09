@@ -10,6 +10,7 @@ bowl = parse_query_obj('bowl')
 target_rotation = vec2quat(-bowl.normal)
 rotation_map[:, :, :] = target_rotation
 ret_val = rotation_map
+# done
 
 # Query: face the table when within 30cm from table center.
 rotation_map = get_empty_rotation_map()
@@ -18,6 +19,7 @@ table_center = table.position
 target_rotation = vec2quat(-table.normal)
 set_voxel_by_radius(rotation_map, table_center, radius_cm=30, value=target_rotation)
 ret_val = rotation_map
+# done
 
 # Query: face the blue bowl.
 rotation_map = get_empty_rotation_map()
@@ -25,6 +27,7 @@ blue_bowl = parse_query_obj('brown block')
 target_rotation = vec2quat(-blue_bowl.normal)
 rotation_map[:, :, :] = target_rotation
 ret_val = rotation_map
+# done
 
 # Query: turn clockwise by 45 degrees when at the center of the beer cap.
 rotation_map = get_empty_rotation_map()
@@ -34,6 +37,7 @@ curr_rotation = rotation_map[x, y, z]
 rotation_delta = euler2quat(0, 0, np.pi / 4)
 rotation_map[x, y, z] = qmult(curr_rotation, rotation_delta)
 ret_val = rotation_map
+# done
 
 # Query: turn counter-clockwise by 30 degrees.
 rotation_map = get_empty_rotation_map()
@@ -41,6 +45,7 @@ curr_rotation = rotation_map[0, 0, 0]
 rotation_delta = euler2quat(0, 0, -np.pi / 6)
 rotation_map[:, :, :] = qmult(curr_rotation, rotation_delta)
 ret_val = rotation_map
+# done
 
 # Query: rotate the gripper to be 45 degrees slanted relative to the plate.
 rotation_map = get_empty_rotation_map()
@@ -51,3 +56,4 @@ rotation_delta = euler2quat(-np.pi / 4, 0, 0)
 target_rotation = qmult(face_plate_quat, rotation_delta)
 rotation_map[:, :, :] = target_rotation
 ret_val = rotation_map
+# done

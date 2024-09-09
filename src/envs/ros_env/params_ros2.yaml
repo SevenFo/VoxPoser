@@ -21,7 +21,7 @@ cameras:
     rgb_frame_id: "front_camera"
     depth_frame_id: "front_camera"
     cloudpoint_frame_id: "front_camera"
-world_frame_id: "world_enu" # right +x, front +y, up +z 必须
+world_frame_id: "world" # right +x, front +y, up +z 必须
 drone_origin_frame_id: "Franka"
 # 坐标系统 todo
 frames_tree:

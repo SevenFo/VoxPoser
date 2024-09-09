@@ -10,6 +10,7 @@ y = 15
 z = 60
 affordance_map[x, y, z] = 1
 ret_val = affordance_map
+# done
 
 # Query: a point on the right side of the table.
 affordance_map = get_empty_affordance_map()
@@ -22,6 +23,7 @@ y = max_y
 z = center_z
 affordance_map[x, y, z] = 1
 ret_val = affordance_map
+# done
 
 # Query: a point 20cm on top of the container.
 affordance_map = get_empty_affordance_map()
@@ -34,6 +36,7 @@ y = center_y
 z = max_z + cm2index(20, 'z')
 affordance_map[x, y, z] = 1
 ret_val = affordance_map
+# done
 
 # Query: a point 1cm to the left of the brown block.
 affordance_map = get_empty_affordance_map()
@@ -46,11 +49,14 @@ y = min_y - cm2index(1, 'y')
 z = center_z
 affordance_map[x, y, z] = 1
 ret_val = affordance_map
+# done
 
 # Query: anywhere within 20cm of the right most block.
 affordance_map = get_empty_affordance_map()
 right_most_block = parse_query_obj('the right most block')
 set_voxel_by_radius(affordance_map, right_most_block.position, radius_cm=20, value=1)
+ret_val = affordance_map
+# done
 
 # Query: a point on the back side of the table.
 affordance_map = get_empty_affordance_map()
@@ -63,6 +69,7 @@ y = center_y
 z = center_z
 affordance_map[x, y, z] = 1
 ret_val = affordance_map
+# done
 
 # Query: a point on the front right corner of the table.
 affordance_map = get_empty_affordance_map()
@@ -75,6 +82,7 @@ y = max_y
 z = center_z
 affordance_map[x, y, z] = 1
 ret_val = affordance_map
+# done
 
 # Query: a point 30cm into the topmost drawer handle.
 affordance_map = get_empty_affordance_map()
@@ -84,6 +92,7 @@ moving_dir = -top_handle.normal
 affordance_xyz = top_handle.position + cm2index(30, moving_dir)
 affordance_map[affordance_xyz[0], affordance_xyz[1], affordance_xyz[2]] = 1
 ret_val = affordance_map
+# done
 
 # Query: a point 5cm above the blue block.
 affordance_map = get_empty_affordance_map()
@@ -96,3 +105,4 @@ y = center_y
 z = max_z + cm2index(5, 'z')
 affordance_map[x, y, z] = 1
 ret_val = affordance_map
+# done

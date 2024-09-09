@@ -34,6 +34,10 @@ from threading import Event as threading_Event
 from threading import RLock as threading_Lock
 import copy
 import rclpy
+from rclpy.action import ActionClient
+from rclpy.node import Node
+from hello_moveit_action.action import MoveAndGripper
+
 
 from sensor_msgs.msg import JointState
 
@@ -42,6 +46,54 @@ HEIGHT = 640
 
 
 class VoxPoserROS2MPEnv:
+    class MoveGroupActionClient:
+
+        def __init__(self, node):
+            self.ros_node = node
+            self._action_client = ActionClient(self.ros_node, MoveAndGripper, 'move_and_gripper')
+
+        def send_goal(self, pose_goal, gripper_state):
+            goal_msg = MoveAndGripper.Goal()
+            goal_msg.pose_goal = pose_goal
+            goal_msg.gripper_state = gripper_state
+
+            self._action_client.wait_for_server()
+
+            # self._send_goal_future = self._action_client.send_goal_async(
+            #     goal_msg,
+            #     feedback_callback=self.feedback_callback
+            # )
+            # self._send_goal_future.add_done_callback(self.goal_response_callback)
+            result = self._action_client.send_goal(
+                goal=goal_msg
+            )
+            # rate = self.ros_node.create_rate(1)
+            # while not self._send_goal_future.done():
+            #     rate.sleep()
+            #     print("wait goal")
+
+        def goal_response_callback(self, future):
+            goal_handle = future.result()
+            if not goal_handle.accepted:
+                self.ros_node.get_logger().info('Goal rejected')
+                return
+
+            self.ros_node.get_logger().info('Goal accepted')
+            self._get_result_future = goal_handle.get_result_async()
+            self._get_result_future.add_done_callback(self.get_result_callback)
+
+        def get_result_callback(self, future):
+            result = future.result().result
+            if result.success:
+                self.ros_node.get_logger().info('Goal succeeded!')
+            else:
+                self.ros_node.get_logger().info('Goal failed')
+            return 
+            # rclpy.shutdown()
+
+        def feedback_callback(self, feedback_msg):
+            feedback = feedback_msg.feedback
+            self.ros_node.get_logger().info(f'Received feedback: {feedback}')
     def __init__(
         self,
         vlmpipeline: Union[VLM, VLMProcessWrapper] = None,
@@ -54,6 +106,7 @@ class VoxPoserROS2MPEnv:
         self.target_objects = target_objects
         self._use_old_airsim = use_old_airsim
         self._cvb = cv_bridge.CvBridge()
+        self.latest_action = None
         self.latest_obs = {}
         self.lookat_vectors = {}
         self.camera_params = {}
@@ -114,11 +167,12 @@ class VoxPoserROS2MPEnv:
         }
 
     def init_ros(self):
-        rclpy.init()
+        rclpy.init(args=['--ros-args', '-p', 'use_sim_time:=true'])
         self.ros_node = rclpy.create_node('voxposer')
         self.ros_logger = self.ros_node.get_logger()
         self._tf_buffer = tf2_ros.Buffer(rclpy.time.Duration(seconds=100))
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer,self.ros_node, spin_thread=True)
+        self._update_ee_pose_timer = self.ros_node.create_timer(1, self.update_ee_pose)
         
         # 初始化参数
         self._world_frame_id = self.configs.world_frame_id
@@ -176,7 +230,8 @@ class VoxPoserROS2MPEnv:
                 ),
                 qos_profile=10
             )
-
+        # joint_state updater
+        self._joint_state_sub = self.ros_node.create_subscription(JointState,"/isaac_joint_states", self.joint_state_callback, qos_profile=10)
         # self._cmd_pub = self.ros_node.create_publisher(
         #     Twist, "/airsim_node/vel_cmd_world_frame",  queue_size=1
         # )
@@ -197,46 +252,39 @@ class VoxPoserROS2MPEnv:
         #     self.reset_service_proxy = rospy.ServiceProxy(
         #         self.configs.reset_service_name, SetBool
         #     )
+        
+        self._action_client = VoxPoserROS2MPEnv.MoveGroupActionClient(self.ros_node)
 
     def get_object_names(self):
         return self.target_objects
 
-    def odom_sub_callback(self, msg: Odometry):
-        pose = msg.pose.pose
-        if msg.header.frame_id != self._world_frame_id:
-            # transform odom from odom_frame to world_frame
-            # self.ros_logger.info(
-            #     f"try transform from {msg.header.frame_id} to {self._world_frame_id}"
-            # )
-            trans = self._tf_buffer.lookup_transform(
-                self._world_frame_id, msg.header.frame_id, rclpy.time.Time()
-            )
-            pose = PoseStamped(header=msg.header, pose=msg.pose.pose)
-            # twist_stamped = TwistStamped(header=msg.header, twist=msg.twist.twist)
-            pose = tf2_geometry_msgs.do_transform_pose(pose, trans).pose
-            # self.ros_logger.info(
-            #     f"transform odom from {msg.header.frame_id} to {self._world_frame_id}"
-            # )
+    def update_ee_pose(self):
+        ee_frame = "panda_hand"
+        if not self._tf_buffer.can_transform(ee_frame,self._world_frame_id,rclpy.time.Time(),timeout=rclpy.time.Duration(seconds=0.5)):
+            self.ros_logger.info(f"cant trans from {self._world_frame_id} to {ee_frame}")
+            return 
+        trans = self._tf_buffer.lookup_transform(self._world_frame_id,ee_frame,rclpy.time.Time(),timeout=rclpy.time.Duration(seconds=0.5))
+        pose = trans.transform
         with self._lock:
             self.latest_obs.update(
                 {
                     "quad_pose": np.array(
                         [
-                            pose.position.x,
-                            pose.position.y,
-                            pose.position.z,
-                            pose.orientation.x,
-                            pose.orientation.y,
-                            pose.orientation.z,
-                            pose.orientation.w,
+                            pose.translation.x,
+                            pose.translation.y,
+                            pose.translation.z,
+                            pose.rotation.x,
+                            pose.rotation.y,
+                            pose.rotation.z,
+                            pose.rotation.w,
                         ]
                         + list(
                             transforms3d.euler.quat2euler(
                                 [
-                                    pose.orientation.w,
-                                    pose.orientation.x,
-                                    pose.orientation.y,
-                                    pose.orientation.z,
+                                    pose.rotation.w,
+                                    pose.rotation.x,
+                                    pose.rotation.y,
+                                    pose.rotation.z,
                                 ]
                             )
                         )
@@ -485,10 +533,10 @@ class VoxPoserROS2MPEnv:
             )
         return action
 
-    def apply_action(self, action, mode="teleport", update_mask=True):
-                # action 的前6个元素是EE位姿，第7个元素是抓手状态
-        ee_pose = action[:6]
-        gripper_state = action[6]
+    def apply_action(self, action, mode="teleport", update_mask=True,speed = None):
+                # action 的前7个元素是EE位姿，第8个元素是抓手状态
+        ee_pose = action[:7]
+        gripper_state = action[7]
 
         # 将EE位姿转换为关节位置并发布
         self.move_to_pose(ee_pose)
@@ -519,14 +567,10 @@ class VoxPoserROS2MPEnv:
         return self.latest_obs, reward, terminate
 
     def move_to_pose(self, pose):
-        return
-        joint_positions_trajectory = self.pose_to_joint_positions(pose)
-        if joint_positions_trajectory:
-            for joint_positions in joint_positions_trajectory:
-                self.publish_joint_positions(joint_positions)
-                time.sleep(0.1)  # 根据需要调整延时
-        else:
-            self.get_logger().error("Failed to compute joint positions for the given pose")
+        print("send goal")
+        self._action_client.send_goal(pose,0)
+        print("goal executed")
+        
     def set_gripper_state(self, state):
         return 
         joint_state = JointState()
@@ -645,6 +689,18 @@ class VoxPoserROS2MPEnv:
 
             # self.visualizer.add_frame(data)
 
+    def get_last_gripper_action(self):
+        """
+        Returns the last gripper action.
+
+        Returns:
+            float: The last gripper action.
+        """
+        if self.latest_action is not None:
+            return self.latest_action[-1]
+        else:
+            return self.init_obs["gripper_open"]
+
     def get_ee_pose(self):
         """
         Get the end effector pose.
@@ -662,6 +718,7 @@ class VoxPoserROS2MPEnv:
             np.ndarray: The end effector position.
         """
         # self.ros_logger.info(f"get_ee_pos: {self.latest_obs['quad_pose'][:3]}")
+        print(f'get ee pos: {self.latest_obs["quad_pose"][:3]}')
         return self.latest_obs["quad_pose"][:3]
 
     def get_ee_quat(self):
@@ -671,7 +728,7 @@ class VoxPoserROS2MPEnv:
         Returns:
             np.ndarray: The end effector quaternion.
         """
-        return self.latest_obs["quad_pose"][3:]
+        return self.latest_obs["quad_pose"][3:7]
 
     def get_ee_oriendation(self):
         """
@@ -747,6 +804,24 @@ class VoxPoserROS2MPEnv:
         look_at = extrinsic_params[:3, :3] @ np.array([0, 0, 1])
         self.lookat_vectors[f"{camera_name}"] = normalize_vector(look_at)
 
+    def joint_state_callback(self, msg: JointState):
+        joint_names = msg.name
+        joint_states_raw = {}
+        for idx, name in enumerate(joint_names):
+            joint_states_raw.update({
+                f"{name}":{
+                    f"position": msg.position[idx],
+                    f"velocity": msg.position[idx],
+                    f"effort": msg.position[idx],
+                }
+            })
+        gripper_open = 0 if all(np.array(msg.position[-2:]) < 0.035) else 1        
+        with self._lock:
+            self.latest_obs.update({
+                "joint_states_raw":joint_states_raw,
+                "gripper_open": gripper_open
+            })
+    
     # def takeoff(self):
     #     self._takeoff_pub.publish(Empty())
 

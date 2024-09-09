@@ -5,8 +5,6 @@ import copy
 import time
 from dynamics_models import PushingDynamicsModel
 
-from envs.pyrep_env.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
-from envs.ros_env.ros_env import VoxPoserROSDroneEnv
 from envs.dummy_env import DummyEnv
 
 # creating some aliases for end effector and table in case LLMs refer to them differently
@@ -227,7 +225,7 @@ class Controller:
 
 
 class SimpleQuadcopterController:
-    def __init__(self, env: VoxPoserPyRepQuadcopterEnv, config) -> None:
+    def __init__(self, env, config) -> None:
         assert (
             type(env) == VoxPoserPyRepQuadcopterEnv or type(env) == DummyEnv
         ), "env type should be VoxPoserPyRepQuadcopterEnv"
@@ -265,7 +263,7 @@ class SimpleQuadcopterController:
 
 
 class SimpleROSController:
-    def __init__(self, env: VoxPoserROSDroneEnv, config) -> None:
+    def __init__(self, env, config) -> None:
         assert (
             type(env) is VoxPoserROSDroneEnv
         ), "env type should be VoxPoserROSDroneEnv"
