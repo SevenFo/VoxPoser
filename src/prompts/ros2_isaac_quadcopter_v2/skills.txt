@@ -1,0 +1,94 @@
+def scout(obj_name)
+    """
+    获取指定对象的 3D 观测结果并进行后处理。
+
+    Args:
+        obj_name (str): 目标对象的名称。
+
+    Returns:
+        list: 包含目标对象观测结果的列表, 不会返回None, 如果有返回值则一定观测到目标否则会抛出错误
+
+    Raises:
+        StateError: 如果未找到目标对象，则抛出此异常。
+
+    """
+
+def goto_lla(latitude, longitude, altitude)
+    """
+    控制无人机飞行到指定的经纬度和高度。
+
+    Args:
+        latitude (float): 目标纬度。
+        longitude (float): 目标经度。
+        altitude (float): 目标高度。
+
+    Returns:
+        bool: 如果任务成功完成，返回 True。
+
+    """
+
+def execute(movable_obs,affordance_map=None,avoidance_map=None)
+    """
+    基于期望目标体素图和障碍体素图生成前往期望目标的路径并控制无人机执行该路径
+
+    Args:
+        movable_obs (dict): 无人机状态的观测结果
+        affordance_map (np.array): 期望目标体素图
+        avoidance_map (np.array): 障碍体素图
+
+    Returns:
+        无返回值
+
+    """
+
+def get_empty_avoidance_map()
+    """
+    获取一张的空的障碍体素图
+
+    Returns:
+        np.array: 体素图 
+    """
+
+def get_empty_affordance_map()
+    """
+    获取一张的空的期望目标体素图
+
+    Returns:
+        np.array: 体素图 
+    """
+
+def set_voxel_by_radius(voxel_map, voxel_xyz, radius_cm=0, value=1)
+    """
+    given a 3D np array, set the value of the voxel at voxel_xyz to value. If radius is specified, set the value of all voxels within the radius to value.
+    
+    Args:
+        voxel_map (np.array): 目标体素图
+        voxel_xyz (np.array): 设置区域的中心位置（体素图的索引）
+        radius_cm (float): default: 0, 设置区域的半径（单位厘米）
+        value (float): default: 1, 设置区域的值
+
+    Returns:
+        np.array: 设置后的体素图
+    """
+
+def cm2index(cm, direction)
+    """
+    将实际长度转化为体素的索引量
+
+    Args:
+        cm (float): 待转化的实际长度（单位厘米）
+        direction (str|np.array): 沿着哪个坐标轴方向进行转化。因为不同方向的体素分辨率不一样，因此需要指定方向，如果为 str 类型，则可为 ("x","y","z"), 否则是 np.array 类型, 并且大小为 (3,)
+    
+    Returns:
+        int: 转化后的体素索引量
+
+def index2cm(index, direction=None)
+    """
+    将体素的索引量转化为实际长度
+
+    Args:
+        index (int): 待转化的体素索引量
+        direction (str|None): default: None, 转化坐标轴方向, 可选 "x","y","z",None
+
+    Returns:
+        float: 转化为的实际长度（单位厘米）

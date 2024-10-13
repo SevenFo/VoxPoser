@@ -1,0 +1,10 @@
+def cm2index(cm, direction)
+    """
+    将实际长度转化为体素的索引量
+
+    Args:
+        cm (float): 待转化的实际长度（单位厘米）
+        direction (str|np.array): 沿着哪个坐标轴方向进行转化。因为不同方向的体素分辨率不一样，因此需要指定方向，如果为 str 类型，则可为 ("x","y","z"), 否则是 np.array 类型, 并且大小为 (3,)
+    
+    Returns:
+        int: 转化后的体素索引量

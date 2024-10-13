@@ -1,0 +1,180 @@
+env_name: ros2_isaac_quadcopter_v2
+
+log_dir: ./logs/ros2_isaac_quadcopter_v2
+
+# env:
+#   ros_params: !include ../envs/ros_env/params_local.yaml
+#   workspace_bounds_min: [-2, 0, -1.2]
+#   workspace_bounds_max: [2, 4, 1.2]
+#   scene_target_objects: ['fire extinguisher']
+#   description: "fly to the point 50cm above fire extinguisher"
+
+# vlm:
+#   input_shape: [3, 720, 1280] # old camera input_shape: [3, 480, 640]
+#   batch_size: 1
+
+env:
+  ros_params: !include ../envs/ros_env/params_ros2_drone_isaac.yaml #!include ../envs/ros_env/params_local.yaml
+  workspace_bounds_min: [-40, -75, 0]
+  workspace_bounds_max: [40, 75, 40]
+  scene_target_objects: ["extinguisher", "tank", "brick wall", "tree"]
+  description: There may be a tank in the vicinity (within 10m radius) of this coordinates(LLA) [38.73678921229966, -9.138002835262391, 110.0573040517047]. Firstly, You need to fly 10 meters in front of the brick wall (keep away from it at least 2.5m), then you need to fly to where the tank might be to scout the tank and back to the position 20m above the starting point. 
+   # There may be a tank in the vicinity (within 10m radius) of this coordinates(LLA) [38.73678921229966, -9.138002835262391, 110.0573040517047]. Firstly, You need to fly 2 meters in front of the tree tree, then you need to fly to where the tank might be to scout the tank and back to the position 20m above the starting pointt. 
+   # After that, you need to fly to the point 25 meters in front of the tank and 21m height, while do not get in range of the tank (radius 20m)
+   # There may be a tank in the vicinity (within 10m radius) of this coordinates(LLA) [38.73678921229966, -9.138002835262391, 110.0573040517047], you need to fly to this place to scout the tank and back to the start point. After getting the tank postion, you need to fly to the point 30 meters in front of the tank, while do not get in range of the tank (radius 20m)
+   #"fly to the coordinates(LLA): [38.7369319, -9.1379769, 100.054] and then scout the tank in your line of sight" #"fly to the point 80cm above red block, than fly to the initial point" # "fly to the wooden house and keep at least 100cm away from the tree"
+
+vlm:
+  input_shape: [3, 640, 640] #[3, 480, 848] # old camera input_shape: [3, 480, 640]  [3, 720, 1280]
+  batch_size: 2
+
+planner:
+  stop_threshold: 0.001
+  savgol_polyorder: 3
+  savgol_window_size: 20
+  obstacle_map_weight: 1
+  max_steps: 300
+  obstacle_map_gaussian_sigma: 10
+  target_map_weight: 2
+  stop_criteria: no_nearby_equal
+  target_spacing: 1
+  max_curvature: 3
+  pushing_skip_per_k: 5
+  pick_per_k: 3
+
+controller:
+  type: SimpleMavlinkController
+  connection_string: udp:localhost:14540
+  mode: traj # pose, velocity, traj
+
+visualizer:
+  quality: low
+  map_size: 200
+
+lmp_config:
+  env:
+    map_size: 200
+    num_waypoints_per_plan: 10000  # set to a large number since we only do open loop for sim
+    max_plan_iter: 1
+    visualize: True
+    detect_memory: True
+    execute_dynamic: True
+  lmps:
+    planner:
+      prompt_fname: real_planner_prompt
+      discription: write planning code, which separates query into multiple parts and generates a plan to achieve the goal
+      model: Dummy
+      max_tokens: 512
+      temperature: 0
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects = '
+        - '# done'
+      maintain_session: True
+      include_context: True
+      has_return: False
+      return_val_name: ret_val
+      load_cache: True
+    composer:
+      prompt_fname: real_composer_prompt
+      discription: write code to use lower APIs and LMPs to achieve the sub-goal delegated by the planner LMP
+      model: Dummy
+      max_tokens: 512
+      temperature: 0
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: True
+      include_context: False
+      has_return: False
+      return_val_name: ret_val
+      load_cache: True
+    parse_query_obj:
+      prompt_fname: real_parse_query_obj_prompt
+      discription: write code to detect the objects described in the query in the environment
+      model: Dummy
+      max_tokens: 512
+      temperature: 0
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: True
+      include_context: True
+      has_return: True
+      return_val_name: ret_val
+      load_cache: True
+    get_affordance_map:
+      prompt_fname: real_get_affordance_map_prompt_2048
+      discription: write code to generate affordance map
+      model: Dummy
+      max_tokens: 512
+      temperature: 0
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: True
+      include_context: False
+      has_return: True
+      return_val_name: ret_val
+      load_cache: True
+    get_avoidance_map:
+      prompt_fname: real_get_avoidance_map_prompt
+      discription: write code to generate avoidance map
+      model: Dummy
+      max_tokens: 512
+      temperature: 0
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: True
+      include_context: False
+      has_return: True
+      return_val_name: ret_val
+      load_cache: True
+    get_velocity_map:
+      prompt_fname: real_get_velocity_map_prompt
+      discription: write code to generate velocity map
+      model: Dummy
+      max_tokens: 512
+      temperature: 0
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: True
+      include_context: False
+      has_return: True
+      return_val_name: ret_val
+      load_cache: True
+    # get_rotation_map:
+    #   prompt_fname: real_get_rotation_map_prompt
+    #   model: Dummy
+    #   max_tokens: 512
+    #   temperature: 0
+    #   query_prefix: '# Query: '
+    #   query_suffix: '.'
+    #   stop:
+    #     - '# Query: '
+    #     - 'objects =        
+    #     - '# done'
+    #   maintain_session: True
+    #   include_context: False
+    #   has_return: True
+    #   return_val_name: ret_val
+    #   load_cache: True

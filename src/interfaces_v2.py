@@ -3,12 +3,11 @@ import asyncio
 import warnings
 import signal
 from functools import partial
-from LMP_MA import LMP, StateError
+from LMP import LMP
 from utils import (
     get_clock_time,
     normalize_vector,
     pointat2quat,
-    load_prompt,
     bcolors,
     Observation,
     VoxelIndexingWrapper,
@@ -62,7 +61,8 @@ class LMP_interface:
         self._env = env
         self._env_name = env_name
         self._cfg = lmp_config
-        self._map_size = self._cfg["map_size"]
+        self._voxel_size = self._cfg["voxel_size"]
+        self._submap_size = self._cfg["submap_size"]
         self._planner = PathPlanner(planner_config, map_size=self._map_size)
         self._latest_obs_results = {}
         _controller_type = controller_config["type"]
@@ -76,11 +76,8 @@ class LMP_interface:
             self._controller = Controller(self._env, controller_config)
         self.is_quad_env = True
         # calculate size of each voxel (resolution)
-        self._resolution = (
-            self._env.workspace_bounds_max - self._env.workspace_bounds_min
-        ) / self._map_size
         print("#" * 50)
-        print(f"## voxel resolution: {self._resolution}")
+        print(f"## voxel resolution: {self._voxel_size}")
         print("#" * 50)
         print()
         print()
@@ -95,39 +92,12 @@ class LMP_interface:
         return self.detect_quad(obj_name, enable_memory)
     
     def scout(self, obj_name):
-        """
-        获取指定对象的 3D 观测结果并进行后处理。
-
-        Args:
-            obj_name (str): 目标对象的名称。
-
-        Returns:
-            list: 包含目标对象观测结果的列表。
-
-        Raises:
-            StateError: 如果未找到目标对象，则抛出此异常。
-
-        """
         # get observation from 
         obs_results = self._env.get_3d_obs_by_name_by_vlm(obj_name, is_sole=True)
-        if obs_results is None:
-            raise StateError(f"Not found target: {obj_name}, you can try fly higher or rotate around")
         object_obs_list = self._post_process_detect_result(obj_name=obj_name, obs_results=obs_results)
         return object_obs_list
     
     def goto_lla(self, latitude, longitude, altitude):
-        """
-        控制无人机飞行到指定的经纬度和高度。
-
-        Args:
-            latitude (float): 目标纬度。
-            longitude (float): 目标经度。
-            altitude (float): 目标高度。
-
-        Returns:
-            bool: 如果任务成功完成，返回 True。
-
-        """
         loop = asyncio.get_event_loop()
         task = loop.create_task(self._controller.goto_lla(latitude,longitude,altitude))
         result = loop.run_until_complete(task)
@@ -565,7 +535,7 @@ class LMP_interface:
         traj_world = loop.run_until_complete(plan_task)
         
         task_finished = False
-        plan_hz = 1/6000
+        plan_hz = 1/60
         
         while not task_finished:
             execute_task = loop.create_task(self._controller.execute(
@@ -1151,16 +1121,6 @@ def setup_LMP(env, general_config, debug=False, engine_call_fn=None, log_dir="./
         "qinverse": transforms3d.quaternions.qinverse,
         "qmult": transforms3d.quaternions.qmult,
     }  # external library APIs
-    
-    skills_prompt = {}
-    skill_exclude = {
-        "planner": ["scout","goto_lla"],
-        "composer": [],
-        "get_affordance_map": ["scout","goto_lla"],
-        "get_avoidance_map": ["scout","goto_lla"],
-        "parse_query_obj": ["scout","goto_lla"],
-    }
-    
     variable_vars = {
         k: getattr(lmp_env, k)
         for k in dir(lmp_env)
@@ -1177,17 +1137,7 @@ def setup_LMP(env, general_config, debug=False, engine_call_fn=None, log_dir="./
     variable_vars["detect"] = partial(
         lmp_env.detect, enable_memory=lmp_env_config["detect_memory"]
     )
-    
-    for var_name, var in variable_vars.items():
-        for lmp in skill_exclude.keys():
-            if lmp not in skills_prompt:
-                skills_prompt[lmp] = ""
-            try:
-                skills_prompt[lmp] += load_prompt(f"{env_name}/skill_schemes/{var_name}.txt") + '\n' if var_name not in skill_exclude[lmp] else ""
-            except FileNotFoundError as e:
-                print(f"file {env_name}/skill_schemes/{var_name}.txt not found, skip")
-                continue
-    print(skills_prompt['planner'])
+
     # allow LMPs to access other LMPs
     lmp_names = [
         name
@@ -1200,53 +1150,36 @@ def setup_LMP(env, general_config, debug=False, engine_call_fn=None, log_dir="./
             lmps_config[k],
             fixed_vars,
             variable_vars,
-            skill_prompts=skills_prompt.get(k,None),
-            debug=debug,
-            env=env_name,
+            debug,
+            env_name,
             engine_call_fn=engine_call_fn,
             log_dir=log_dir,
         )
         for k in lmp_names
     }
     variable_vars.update(low_level_lmps)
-    for k in lmp_names:
-        if "composer" not in skills_prompt:
-            skills_prompt["composer"] = ""
-        try:
-            skills_prompt["composer"] += load_prompt(f"{env_name}/skill_schemes/{k}.txt") + '\n' if k not in skill_exclude[lmp] else ""
-        except FileNotFoundError as e:
-            print(f"file {env_name}/skill_schemes/{k}.txt not found, skip")
-            continue
+
     # creating the LMP for skill-level composition
     composer = LMP(
         "composer",
         lmps_config["composer"],
         fixed_vars,
         variable_vars,
-        skill_prompts=skills_prompt["composer"],
-        debug=debug,
-        env=env_name,
+        debug,
+        env_name,
         engine_call_fn=engine_call_fn,
         log_dir=log_dir,
     )
     variable_vars["composer"] = composer
-    for k in lmp_names + ["composer"]:
-        if "planner" not in skills_prompt:
-            skills_prompt["planner"] = ""
-        try:
-            skills_prompt["planner"] += load_prompt(f"{env_name}/skill_schemes/{k}.txt") + '\n' if k not in skill_exclude[lmp] else ""
-        except FileNotFoundError as e:
-            print(f"file {env_name}/skill_schemes/{k}.txt not found, skip")
-            continue
+
     # creating the LMP that deals w/ high-level language commands
     task_planner = LMP(
         "planner",
         lmps_config["planner"],
         fixed_vars,
         variable_vars,
-        skill_prompts=skills_prompt['planner'],
-        debug=debug,
-        env=env_name,
+        debug,
+        env_name,
         engine_call_fn=engine_call_fn,
         log_dir=log_dir,
     )
@@ -1263,66 +1196,62 @@ def setup_LMP(env, general_config, debug=False, engine_call_fn=None, log_dir="./
 # ======================================================
 # jit-ready functions (for faster replanning time, need to install numba and add "@njit")
 # ======================================================
-def pc2voxel(pc, voxel_bounds_robot_min, voxel_bounds_robot_max, map_size):
-    """voxelize a point cloud"""
+def pc2rawvoxel(pc, voxel_size = 0.2):
+    """Voxelize a point cloud without fixed bounds.
+        voxel_size: (x m)^3 as a voxel, default 0.5
+    """
     pc = pc.astype(np.float32)
-    # make sure the point is within the voxel bounds
-    pc = np.clip(pc, voxel_bounds_robot_min, voxel_bounds_robot_max)
-    # voxelize
-    voxels = (
-        (pc - voxel_bounds_robot_min)
-        / (voxel_bounds_robot_max - voxel_bounds_robot_min)
-        * (map_size - 1)
-    )
-    # to integer
-    _out = np.empty_like(voxels)
-    voxels = np.round(voxels, 0, _out).astype(np.int32)
-    assert np.all(voxels >= 0), f"voxel min: {voxels.min()}"
-    assert np.all(voxels < map_size), f"voxel max: {voxels.max()}"
+    # Calculate voxel indices
+    voxels = np.floor(pc / voxel_size).astype(np.int32)
     return voxels
 
-
-def voxel2pc(voxels, voxel_bounds_robot_min, voxel_bounds_robot_max, map_size):
+def rawvoxel2pc(voxels, voxel_size = 0.2):
     """de-voxelize a voxel"""
     # check voxel coordinates are non-negative
-    assert np.all(voxels >= 0), f"voxel min: {voxels.min()}"
-    assert np.all(voxels < map_size), f"voxel max: {voxels.max()}"
-    voxels = voxels.astype(np.float32)
-    # de-voxelize
-    pc = (
-        voxels / (map_size - 1) * (voxel_bounds_robot_max - voxel_bounds_robot_min)
-        + voxel_bounds_robot_min
-    )
+    pc = voxels.astype(np.float32) * voxel_size
     return pc
 
+def vox_global_to_local(voxels, submap_size = [20,20,20]):
+    """Convert global voxel coordinates to local voxel coordinates and determine submap offsets.
+    
+    Args:
+        voxels (np.ndarray): 全局体素坐标，形状为 (N, 3)。
+        submap_size (np.ndarray): 子地图大小，形状为 (3,)。
+        
+    Returns:
+        local_voxels (np.ndarray): 局部体素坐标，形状为 (N, 3)。
+        offsets (np.ndarray): 子地图偏移量，形状为 (N, 3)。
+    """
+    offsets = np.floor_divide(voxels, submap_size)
+    local_voxels = np.mod(voxels, submap_size)
+    return local_voxels, offsets
 
-def pc2voxel_map(points, voxel_bounds_robot_min, voxel_bounds_robot_max, map_size):
-    """given point cloud, create a fixed size voxel map, and fill in the voxels"""
-    points = points.astype(np.float32)
-    voxel_bounds_robot_min = voxel_bounds_robot_min.astype(np.float32)
-    voxel_bounds_robot_max = voxel_bounds_robot_max.astype(np.float32)
-    # make sure the point is within the voxel bounds
-    points = np.clip(points, voxel_bounds_robot_min, voxel_bounds_robot_max)
-    # voxelize
-    voxel_xyz: np.array = (
-        (points - voxel_bounds_robot_min)
-        / (voxel_bounds_robot_max - voxel_bounds_robot_min)
-        * (map_size - 1)
-    )
-    # to integer
-    _out = np.empty_like(voxel_xyz)
-    if np.any(np.isnan(voxel_xyz)) or np.any(np.isinf(voxel_xyz)):
-        # dump_file = f"./dumps/voxel_xyz_{get_clock_time(True)}.txt"
-        # dump_file_replace = f"./dumps/voxel_xyz_replace_{get_clock_time(True)}.txt"
-        # np.savetxt(dump_file, voxel_xyz)
-        print("nan or inf detected")
-        # print(
-        #     f"nan or inf in voxel_xyz, please check {dump_file}, we will replace them with numbers, please check {dump_file_replace}"
-        # )
-        voxel_xyz = np.nan_to_num(voxel_xyz, copy=True)
-        # np.savetxt(dump_file_replace, voxel_xyz)
-    points_vox = np.round(voxel_xyz, 0, _out).astype(np.int32)
-    voxel_map = np.zeros((map_size, map_size, map_size))
-    for i in range(points_vox.shape[0]):
-        voxel_map[points_vox[i, 0], points_vox[i, 1], points_vox[i, 2]] = 1
-    return voxel_map
+def pc2global_voxel_map(points, voxel_size = 0.2, submap_size = [20,20,20]):
+    """
+    Create a global voxel map with submaps of fixed size.
+    
+    Args:
+        points (np.array): Point cloud data.
+        voxel_size (float): Size of each voxel.
+        submap_size (np.ndarray): 子地图大小，形状为 (3,)。
+        
+    Returns:
+        dict: A dictionary where keys are submap offsets and values are the voxel maps.
+    """
+    # Step 1: Voxelize the point cloud to get global voxel coordinates
+    global_voxels = pc2rawvoxel(points, voxel_size)
+    
+    # Step 2: Convert global voxel coordinates to local coordinates within their respective submaps
+    local_voxels, offsets = vox_global_to_local(global_voxels, submap_size)
+    
+    # Step 3: Initialize a dictionary to hold submaps
+    submaps = {}
+    
+    for idx, voxel in enumerate(local_voxels):
+        offset = tuple(offsets[idx])
+        if offset not in submaps:
+            submaps[offset] = np.zeros(submap_size)
+        
+        submaps[offset][voxel[0], voxel[1], voxel[2]] = 1
+    
+    return submaps

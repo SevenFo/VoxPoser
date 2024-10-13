@@ -1,7 +1,9 @@
-type: OllamaV2
-model: deepseek-coder-v2:latest #llama3.1:70b
-url: http://127.0.0.1
-port: 11434
+type: OpenAIV2
+model: deepseek-chat #gpt-4o #llama3.1:70b
+base_url: https://api.deepseek.com/v1
+# https://oneapi.deepwisdom.ai/v1
+api_key: sk-819adccf925749feb437daeb1612f9cd 
+# sk-x70N3KOUmi1jHPZeA936F6D048B64159BbCb00A203E41b27
 default_temperature: 0.0
 model_instruction: "" # To complete the code required by the Query, you don't need to add any explanatory text, just start with python code
 system_instruction: "You are a software engineer, you need to complete the code to control the quadrotor to execute the task described in the Query, we have provided the code template, you need to complete the code to make the quadrotor complete the task, use Python"

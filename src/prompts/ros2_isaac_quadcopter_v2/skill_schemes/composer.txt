@@ -1,0 +1,8 @@
+def composer(query)
+    """    
+    Args:
+        query (str): 发送给该 LMP 的请求字符串, 让其利用各种工具和技能完成指定的字符串指定的子任务
+    
+    Raises
+        StateError: 如果为任务无法完成则会抛出该异常
+    """

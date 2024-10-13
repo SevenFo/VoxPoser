@@ -14,6 +14,8 @@ from urllib.parse import urlencode
 from wsgiref.handlers import format_date_time
 from LLM_cache import DiskCache
 from utils import get_clock_time
+import openai
+from openai import OpenAI
 
 import websocket  # 使用websocket_client
 
@@ -243,7 +245,7 @@ class TGI:
             self._cache_root_dir, self._full_name, get_clock_time()
         )
         self._cache_dir_base = os.path.join(
-            self._cache_root_dir, self._full_name, "persistent"
+            self._cache_root_dir, self._full_name, "ros2_isaac_env_persistent"
         )
         if self._load_cache and not os.path.exists(self._cache_dir_base):
             os.makedirs(self._cache_dir_base)
@@ -341,6 +343,110 @@ class TGI:
             print(f"cached {cache_key}")
         return ret
 
+class OllamaV2:
+    """
+    class that warp the interface of Ollama
+    """
+
+    def __init__(self, **kwargs) -> None:
+        self._model_name = kwargs["model"]
+        self._full_name = kwargs["type"] + ":" + kwargs["model"]
+        self._url = kwargs["url"] + ":" + str(kwargs["port"])
+        self._temperature = (
+            0.1
+            if "default_temperature" not in kwargs
+            else kwargs["default_temperature"]
+        )
+        self._load_cache = kwargs["load_cache"] if "load_cache" in kwargs else False
+        self._cache_root_dir = kwargs["cache_root_dir"]
+        self._persistent = kwargs.get("is_cache_persistent", True)
+        self._init_cache()
+
+    def _init_cache(self):
+        self._cache_dir_base = os.path.join(
+            self._cache_root_dir, self._full_name, get_clock_time()
+        ) if not self._persistent else os.path.join(
+            self._cache_root_dir, self._full_name, "persistent"
+        )
+        if self._load_cache and not os.path.exists(self._cache_dir_base):
+            os.makedirs(self._cache_dir_base)
+        self._cache = DiskCache(
+            load_cache=self._load_cache, cache_dir=self._cache_dir_base
+        )
+
+    def __call__(self, **kwds: Any) -> Any:
+        assert "messages" in kwds.keys(), "engine call kwargs not contain messages"
+        messages = kwds["messages"]
+
+        use_cache = (
+            False
+            if ("use_cache" not in kwds or not self._load_cache)
+            else kwds["use_cache"]
+        )
+        temperature = (
+            self._temperature if "temperature" not in kwds else kwds["temperature"]
+        )
+        stop_tokens = [] if "stop" not in kwds else kwds["stop"]
+
+        payload = json.dumps(
+            {
+                "model": self._model_name,
+                "messages": messages,
+                "stream": False,
+                "keep_alive": "5m",
+                "options": {
+                    "num_predict": 512,
+                    "num_ctx": 4564,
+                    "temperature": temperature,
+                    # "stop": stop_tokens,
+                    # "top_k": 40,
+                    # "top_p": 0.9,
+                },
+            }
+        )
+        headers = {"Content-Type": "application/json"}
+        cache_key = {f"{self._full_name}": payload}
+        if use_cache and False:
+            if cache_key in self._cache:
+                print("(using cache)", end=" ")
+                return self._cache[cache_key]
+        try:
+            response = requests.request(
+                "POST",
+                f"{self._url}/api/chat",
+                headers=headers,
+                data=payload,
+            )
+            response = response.json()
+            code_str = response["message"]["content"]
+
+            # To calculate how fast the response is generated in tokens per second (token/s), divide eval_count / eval_duration * 10^9.
+            generated_speed = response["eval_count"] / response["eval_duration"] * 10**9
+            print(
+                f"[engine_interface.py|Ollama] generated_speed: {generated_speed:.2f} token/s"
+            )
+        except KeyError as e:
+            print("KeyError:", e)
+            print(response.content)
+            print(payload)
+            exit(1)
+            # TODO: if reach the max length of API limit, need to switch to a shorter version
+        except Exception as e:
+            print("KeyError:", e)
+            print(response.content)
+            print(payload)
+            exit(1)
+        print("code_str:\n", code_str, "\n")
+        code_segments = extract_content(code_str)
+        if len(code_segments) > 0:
+            ret = code_segments[0].strip()
+        else:
+            ret = chinese_filter(code_str).strip()
+
+        # whatever caching the result
+        if self._load_cache:
+            self._cache[cache_key] = ret
+        return ret
 
 class Ollama:
     """
@@ -362,8 +468,11 @@ class Ollama:
         )
         self._load_cache = kwargs["load_cache"] if "load_cache" in kwargs else False
         self._cache_root_dir = kwargs["cache_root_dir"]
+        self._persistent = kwargs.get("is_cache_persistent", True)
         self._cache_dir_base = os.path.join(
             self._cache_root_dir, self._full_name, get_clock_time()
+        ) if not self._persistent else os.path.join(
+            self._cache_root_dir, self._full_name, "persistent"
         )
         if self._load_cache and not os.path.exists(self._cache_dir_base):
             os.makedirs(self._cache_dir_base)
@@ -604,7 +713,103 @@ class Spark:
         else:
             return self.answer
 
+class OpenAIV2:
+    """
+    Class that wraps the interface of OpenAI
+    """
 
+    def __init__(self, **kwargs) -> None:
+        self._model_name = kwargs["model"]
+        self._api_key = kwargs["api_key"]
+        # openai.api_key = self._api_key
+        self._base_url = kwargs.get("base_url", "https://api.openai.com/v1")
+        # openai.api_base = self._base_url
+        self._temperature = (
+            0.1
+            if "default_temperature" not in kwargs
+            else kwargs["default_temperature"]
+        )
+        self._load_cache = kwargs["load_cache"] if "load_cache" in kwargs else False
+        self._cache_root_dir = kwargs["cache_root_dir"]
+        self._persistent = kwargs.get("is_cache_persistent", True)
+        self._client = OpenAI(
+            base_url=self._base_url,
+            api_key=self._api_key
+        )
+        self._init_cache()
+
+    def _init_cache(self):
+        self._cache_dir_base = os.path.join(
+            self._cache_root_dir, self._model_name, get_clock_time()
+        ) if not self._persistent else os.path.join(
+            self._cache_root_dir, self._model_name, "persistent"
+        )
+        if self._load_cache and not os.path.exists(self._cache_dir_base):
+            os.makedirs(self._cache_dir_base)
+        self._cache = DiskCache(
+            load_cache=self._load_cache, cache_dir=self._cache_dir_base
+        )
+
+    def __call__(self, **kwds: Any) -> Any:
+        assert "messages" in kwds.keys(), "engine call kwargs not contain messages"
+        messages = kwds["messages"]
+
+        use_cache = (
+            False
+            if ("use_cache" not in kwds or not self._load_cache)
+            else kwds["use_cache"]
+        )
+        temperature = (
+            self._temperature if "temperature" not in kwds else kwds["temperature"]
+        )
+        stop_tokens = [] if "stop" not in kwds else kwds["stop"]
+
+        payload = {
+            "model": self._model_name,
+            "messages": messages,
+            "temperature": temperature,
+            # "stop": stop_tokens,
+            # "top_k": 40,
+            # "top_p": 0.9,
+        }
+        cache_key = {f"{self._model_name}": json.dumps(payload)}
+        if use_cache:
+            if cache_key in self._cache:
+                print("(using cache)", end=" ")
+                return self._cache[cache_key]
+        try:
+            response = self._client.chat.completions.create(**payload)
+            code_str = response.choices[0].message.content
+
+            # To calculate how fast the response is generated in tokens per second (token/s), divide eval_count / eval_duration * 10^9.
+            generated_speed = response.usage.total_tokens / response.usage.completion_tokens * 10**9
+            print(
+                f"[engine_interface.py|OpenAI] generated_speed: {generated_speed:.2f} token/s"
+            )
+        except KeyError as e:
+            print("KeyError:", e)
+            print(response)
+            print(payload)
+            exit(1)
+            # TODO: if reach the max length of API limit, need to switch to a shorter version
+        except Exception as e:
+            print("Exception:", e)
+            print(response)
+            print(payload)
+            exit(1)
+        print("code_str:\n", code_str, "\n")
+        code_segments = extract_content(code_str)
+        if len(code_segments) > 0:
+            ret = code_segments[0].strip()
+        else:
+            ret = chinese_filter(code_str).strip()
+
+        # whatever caching the result
+        if self._load_cache:
+            self._cache[cache_key] = ret
+        return ret
+    
+    
 class Dummy:
     """Dunmmy engine for test, it will return the test code directly"""
 

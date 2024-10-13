@@ -7,7 +7,6 @@ from pygments.formatters import TerminalFormatter
 from utils import load_prompt, DynamicObservation, IterableDynamicObservation
 import time, textwrap, inspect, re, os
 
-
 class LMP:
     """Language Model Program (LMP), adopted from Code as Policies."""
 

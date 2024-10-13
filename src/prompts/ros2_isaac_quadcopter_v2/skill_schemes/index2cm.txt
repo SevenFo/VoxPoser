@@ -1,0 +1,10 @@
+def index2cm(index, direction=None)
+    """
+    将体素的索引量转化为实际长度
+
+    Args:
+        index (int): 待转化的体素索引量
+        direction (str|None): default: None, 转化坐标轴方向, 可选 "x","y","z",None
+
+    Returns:
+        float: 转化为的实际长度（单位厘米）

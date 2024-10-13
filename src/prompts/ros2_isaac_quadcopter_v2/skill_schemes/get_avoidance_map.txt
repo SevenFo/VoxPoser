@@ -1,0 +1,8 @@
+def get_avoidance_map(query)
+    """    
+    Args:
+        query (str): 发送给该 LMP 的请求字符串, 让其编写代码返回一个避开某个目标的体素图
+    
+    Returns:
+        np.array: 体素图
+    """

@@ -1,0 +1,57 @@
+import numpy as np
+from env_utils import execute, reset_to_default_pose, index2cm
+from perception_utils import parse_query_obj
+from plan_utils import get_affordance_map, get_avoidance_map, get_velocity_map
+from drone_skills import goto_lla, scout
+# +Y: front, +X: right, +Z: up
+
+# Query: move to 10cm above the table.
+movable = parse_query_obj('quadcopter')
+affordance_map = get_affordance_map('a point 10cm above the table')
+execute(movable, affordance_map=affordance_map)
+# done
+
+# Query: move forward to 100cm from current position
+movable = parse_query_obj('quadcopter')
+current_position = movable.position # record current position
+affordance_map = get_affordance_map(f'a point 100cm in front of the {current_position}')
+execute(movable, affordance_map=affordance_map)
+# done
+
+# Query: move to 2m in front of the table.
+movable = parse_query_obj('quadcopter')
+affordance_map = get_affordance_map("2m in front of the table")
+execute(movable, affordance_map=affordance_map) 
+
+# Query: move to 10cm above the yellow block while keeping at least 30cm away from the mug.
+movable = parse_query_obj('quadcopter')
+affordance_map = get_affordance_map('a point 10cm above the yellow block')
+avoidance_map = get_avoidance_map('30cm near the mug')
+execute(movable, affordance_map=affordance_map, avoidance_map=avoidance_map)
+# done
+
+# Query: move to {a precise point}.
+movable = parse_query_obj('quadcopter')
+affordance_map = get_affordance_map(f'a point at a precise point')
+execute(movable, affordance_map=affordance_map)
+# done
+
+# Query: move to {a precise point} while keep away from tree
+movable = parse_query_obj('quadcopter')
+affordance_map = get_affordance_map(f'a point at {a precise point}') # in voxel index
+avoidance_map = get_avoidance_map('50cm near the tree')
+execute(movable, affordance_map=affordance_map, avoidance_map=avoidance_map)
+# done
+
+# Query: move to the [100.03, 3.43, 20] (LLA) and then scout the tank
+goto_lla(100.03, 3.43, 20)
+ret_val = scout("tank")
+# done
+
+# Query: move to the point 25 meters in front of the tank and 21m height
+tank = parse_query_obj('tank')
+(min_x, min_y, min_z), (max_x, max_y, max_z) = tank.aabb
+front_point = np.array([(min_x + max_x) / 2, max_y + cm2index(2500,"y"), cm2index(2100,"z")])
+affordance_map = get_affordance_map(f'a point at {front_point}')
+avoidance_map = get_avoidance_map('20m near the tank')
+execute(movable, affordance_map=affordance_map, avoidance_map=avoidance_map) 

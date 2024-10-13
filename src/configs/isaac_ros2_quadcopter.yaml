@@ -1,0 +1,171 @@
+env_name: ros2_isaac_quadcopter
+
+log_dir: ./logs/ros2_isaac_quadcopter
+
+# env:
+#   ros_params: !include ../envs/ros_env/params_local.yaml
+#   workspace_bounds_min: [-2, 0, -1.2]
+#   workspace_bounds_max: [2, 4, 1.2]
+#   scene_target_objects: ['fire extinguisher']
+#   description: "fly to the point 50cm above fire extinguisher"
+
+# vlm:
+#   input_shape: [3, 720, 1280] # old camera input_shape: [3, 480, 640]
+#   batch_size: 1
+
+env:
+  ros_params: !include ../envs/ros_env/params_ros2_drone_isaac.yaml #!include ../envs/ros_env/params_local.yaml
+  workspace_bounds_min: [-5, -5, 0]
+  workspace_bounds_max: [5, 15, 5.0]
+  scene_target_objects: ["extinguisher", "toy tank", "wooden house", "tree", "red block"]
+  description: "fly to the point 80cm above red block, than fly to the initial point" # "fly to the wooden house and keep at least 100cm away from the tree"
+
+vlm:
+  input_shape: [3, 640, 640] #[3, 480, 848] # old camera input_shape: [3, 480, 640]  [3, 720, 1280]
+  batch_size: 1
+
+planner:
+  stop_threshold: 0.001
+  savgol_polyorder: 3
+  savgol_window_size: 20
+  obstacle_map_weight: 1
+  max_steps: 300
+  obstacle_map_gaussian_sigma: 10
+  target_map_weight: 2
+  stop_criteria: no_nearby_equal
+  target_spacing: 1
+  max_curvature: 3
+  pushing_skip_per_k: 5
+  pick_per_k: 5
+
+controller:
+  type: SimpleMavlinkController
+  connection_string: udp:localhost:14540
+  mode: traj # pose, velocity, traj
+
+visualizer:
+  quality: low
+  map_size: 100
+
+lmp_config:
+  env:
+    map_size: 100
+    num_waypoints_per_plan: 10000  # set to a large number since we only do open loop for sim
+    max_plan_iter: 1
+    visualize: True
+    detect_memory: True
+    execute_dynamic: True
+    execute_async: True
+  lmps:
+    planner:
+      prompt_fname: real_planner_prompt
+      model: Dummy
+      max_tokens: 512
+      temperature: 0.3
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects = '
+        - '# done'
+      maintain_session: False
+      include_context: True
+      has_return: False
+      return_val_name: ret_val
+      load_cache: True
+    composer:
+      prompt_fname: real_composer_prompt
+      model: Dummy
+      max_tokens: 512
+      temperature: 0.3
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: False
+      include_context: False
+      has_return: False
+      return_val_name: ret_val
+      load_cache: True
+    parse_query_obj:
+      prompt_fname: real_parse_query_obj_prompt
+      model: Dummy
+      max_tokens: 512
+      temperature: 0.3
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: False
+      include_context: True
+      has_return: True
+      return_val_name: ret_val
+      load_cache: True
+    get_affordance_map:
+      prompt_fname: real_get_affordance_map_prompt_2048
+      model: Dummy
+      max_tokens: 512
+      temperature: 0.3
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: False
+      include_context: False
+      has_return: True
+      return_val_name: ret_val
+      load_cache: True
+    get_avoidance_map:
+      prompt_fname: real_get_avoidance_map_prompt
+      model: Dummy
+      max_tokens: 512
+      temperature: 0.3
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: False
+      include_context: False
+      has_return: True
+      return_val_name: ret_val
+      load_cache: True
+    get_velocity_map:
+      prompt_fname: real_get_velocity_map_prompt
+      model: Dummy
+      max_tokens: 512
+      temperature: 0.3
+      query_prefix: '# Query: '
+      query_suffix: '.'
+      stop:
+        - '# Query: '
+        - 'objects ='
+        - '# done'
+      maintain_session: False
+      include_context: False
+      has_return: True
+      return_val_name: ret_val
+      load_cache: True
+    # get_rotation_map:
+    #   prompt_fname: real_get_rotation_map_prompt
+    #   model: Dummy
+    #   max_tokens: 512
+    #   temperature: 0.3
+    #   query_prefix: '# Query: '
+    #   query_suffix: '.'
+    #   stop:
+    #     - '# Query: '
+    #     - 'objects =        
+    #     - '# done'
+    #   maintain_session: False
+    #   include_context: False
+    #   has_return: True
+    #   return_val_name: ret_val
+    #   load_cache: True

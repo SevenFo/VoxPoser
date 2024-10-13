@@ -1,0 +1,13 @@
+def execute(movable_obs,affordance_map=None,avoidance_map=None)
+    """
+    基于期望目标体素图和障碍体素图生成前往期望目标的路径并控制无人机执行该路径
+
+    Args:
+        movable_obs (dict): 无人机状态的观测结果
+        affordance_map (np.array): 期望目标体素图
+        avoidance_map (np.array): 障碍体素图
+
+    Returns:
+        无返回值
+
+    """

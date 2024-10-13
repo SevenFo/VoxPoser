@@ -1,0 +1,13 @@
+def goto_lla(latitude, longitude, altitude)
+    """
+    控制无人机飞行到指定的经纬度和高度。
+
+    Args:
+        latitude (float): 目标纬度。
+        longitude (float): 目标经度。
+        altitude (float): 目标高度。
+
+    Returns:
+        bool: 如果任务成功完成，返回 True。
+
+    """

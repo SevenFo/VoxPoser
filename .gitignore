@@ -23,6 +23,7 @@ build/
 devel/
 *.mp4
 cache/
+cache_test/
 *.whl
 VoxPoser.code-workspace
 *.png
@@ -31,3 +32,4 @@ VoxPoser.code-workspace
 *.gv
 install/
 log/
+achieved/

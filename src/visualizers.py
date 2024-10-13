@@ -84,6 +84,7 @@ class ValueMapVisualizer:
             )
 
     def update_scene_points(self, points: np.array, colors=None):
+        print(points.shape)
         minx, miny, minz = self.workspace_bounds_min
         maxx, maxy, maxz = self.workspace_bounds_max
         mask = np.stack(
