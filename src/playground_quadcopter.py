@@ -10,6 +10,7 @@ from utils import set_lmp_objects
 import numpy as np
 import engine_interfaces
 from envs.pyrep_env.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
+
 # from envs.ros_env.ros_env import VoxPoserROSDroneEnv
 from engine_interfaces import Dummy
 from VLMPipline.VLM import VLM
@@ -49,48 +50,13 @@ if __name__ == "__main__":
         input_batch_size=5,
     )
     vlmpipeline.start()
-    # vlmpipeline = VLM(
-    #     owlv2_model_path,
-    #     sam_model_path,
-    #     xmem_model_path,
-    #     resnet_18_path,
-    #     resnet_50_path,
-    #     verbose=False,
-    #     resize_to=[480, 480],
-    #     verbose_frame_every=1,
-    #     input_batch_size=5,
-    # )
-    # vlmpipeline = VLM(
-    #     owlv2_model_path,
-    #     sam_model_path,
-    #     xmem_model_path,
-    #     resnet_18_path,
-    #     resnet_50_path,
-    #     verbose=False,
-    #     resize_to=[640, 640],
-    #     verbose_frame_every=1,
-    #     input_batch_size=5,
-    # )
-    prefix = "/shared/codes/VoxPoser"
 
-    # sparkv3_engine_config = load_config(os.path.join(prefix,"src/configs/sparkv3_config.yaml"))
-    # sparkv35_engine_config = load_config(os.path.join(prefix,"src/configs/sparkv3_5_config.yaml"))
-    # erniev4_engine_config = load_config(os.path.join(prefix,"src/configs/ERNIEv4_config.yaml"))
-    tgi_config = load_config(
-        os.path.join(prefix, "src/configs/TGI_deepseek-coder-6.7B-instruct-AWQ.yaml")
-    )
+    prefix = "/shared/codes/VoxPoser.worktrees/VoxPoser"
+
     tgi_config33 = load_config(
         os.path.join(prefix, "src/configs/TGI_deepseek-coder-33B-instruct-AWQ.yaml")
     )
-    # engine_erniev4 = getattr(engine_interfaces, erniev4_engine_config["type"])(
-    #     **erniev4_engine_config
-    # )  # engine initialization
-    # engine_sparkv3 = getattr(engine_interfaces, sparkv3_engine_config["type"])(
-    #     **sparkv35_engine_config
-    # )  # engine initialization
-    engine_tgi_deepseek = getattr(engine_interfaces, tgi_config["type"])(
-        **tgi_config
-    )  # engine initialization
+
     engine_tgi_deepseek33 = getattr(engine_interfaces, tgi_config["type"])(
         **tgi_config33
     )  # engine initialization
@@ -103,7 +69,6 @@ if __name__ == "__main__":
         vlmpipeline=vlmpipeline,
         target_objects=scene_target_objects,
     )
-    # env = VoxPoserROSDroneEnv(vlmpipeline=vlmpipeline, visualizer=visualizer)
     descriptions, obs = env.reset()
     descriptions = "fly to the table, then fly to the tree, and at last fly to the sofa"
     # descriptions = "fly to the apple, then fly to the point where you started"

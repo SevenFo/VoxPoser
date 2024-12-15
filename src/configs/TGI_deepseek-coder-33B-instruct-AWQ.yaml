@@ -1,10 +1,10 @@
 type: TGI
 version: deepseek-coder-33B-instruct-AWQ
-# secret: !include ./secret/ernie.yaml
-# url_cred: https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${api_key}&client_secret=${secret_key}
 url: http://127.0.0.1
 port: 10013
+# model_instruction 将被添加到每次请求的query之前
 model_instruction: "continue the code to control the quadrotor to execute the task described in the Query, we have provided the code template, you need to complete the code to make the quadrotor complete the task, use Python"
+# system_instruction 为系统提示，用来对LLM的角色进行描述
 system_instruction: "you are a software engineer, you need to complete the code to control the quadrotor to execute the task described in the Query, we have provided the code template, you need to complete the code to make the quadrotor complete the task, use Python"
-load_cache: True
-cache_root_dir: ./cache
+load_cache: True # 是否启用缓存
+cache_root_dir: ./cache # 默认缓存路径

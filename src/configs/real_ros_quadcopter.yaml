@@ -2,27 +2,16 @@ env_name: real_ros_quadcopter
 
 log_dir: ./logs/real_ros_quadcopter
 
-# env:
-#   ros_params: !include ../envs/ros_env/params_local.yaml
-#   workspace_bounds_min: [-2, 0, -1.2]
-#   workspace_bounds_max: [2, 4, 1.2]
-#   scene_target_objects: ['fire extinguisher']
-#   description: "fly to the point 50cm above fire extinguisher"
-
-# vlm:
-#   input_shape: [3, 720, 1280] # old camera input_shape: [3, 480, 640]
-#   batch_size: 1
-
 env:
-  ros_params: !include ../envs/ros_env/params_local_old_camera.yaml #!include ../envs/ros_env/params_local.yaml
-  workspace_bounds_min: [-2, 0, 0]
-  workspace_bounds_max: [2, 6, 2.0]
-  scene_target_objects: ["extinguisher", "toy tank", "wooden house", "tree"]
-  description: "fly to the point 80cm above extinguisher, than fly to the initial point" # "fly to the wooden house and keep at least 100cm away from the tree"
+  ros_params: !include ../envs/ros_env/params_local_old_camera.yaml # ROS 相关参数 #!include ../envs/ros_env/params_local.yaml
+  workspace_bounds_min: [-2, 0, 0] # [x_min, y_min, z_min] unit: meter
+  workspace_bounds_max: [2, 6, 2.0] # [x_max, y_max, z_max] unit: meter
+  scene_target_objects: ["extinguisher", "toy tank", "wooden house", "tree"] # 环境中可能存在的物体名称
+  description: "fly to the point 80cm above extinguisher, than fly to the initial point" # 任务指令 "fly to the wooden house and keep at least 100cm away from the tree"
 
 vlm:
-  input_shape: [3, 480, 640] #[3, 480, 848] # old camera input_shape: [3, 480, 640]  [3, 720, 1280]
-  batch_size: 1
+  input_shape: [3, 480, 640] # 图像大小 #[3, 480, 848] # old camera input_shape: [3, 480, 640]  [3, 720, 1280]
+  batch_size: 1 # 几个摄像头
 
 planner:
   stop_threshold: 0.001
@@ -36,7 +25,7 @@ planner:
   target_spacing: 1
   max_curvature: 3
   pushing_skip_per_k: 5
-  pick_per_k: 5
+  pick_per_k: 5 # 对生成的路径进行稀疏化，每隔多少个点保留一个路径点
 
 controller:
   type: SimpleROSController
@@ -50,14 +39,14 @@ visualizer:
   quality: low
   map_size: 100
 
-lmp_config:
+lmp_config: # LMP 相关配置项，包括LLM调用参数、Prompt文件名等
   env:
     map_size: 100
     num_waypoints_per_plan: 10000  # set to a large number since we only do open loop for sim
     max_plan_iter: 1
     visualize: True
-    detect_memory: True
-    execute_dynamic: True
+    detect_memory: True # 是否保留最后一次观测的信息
+    execute_dynamic: True # 是否边规划边执行
   lmps:
     planner:
       prompt_fname: real_planner_prompt
@@ -66,7 +55,7 @@ lmp_config:
       temperature: 0.3
       query_prefix: '# Query: '
       query_suffix: '.'
-      stop:
+      stop: # stop tokens
         - '# Query: '
         - 'objects = '
         - '# done'

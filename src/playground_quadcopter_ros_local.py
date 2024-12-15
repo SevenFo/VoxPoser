@@ -2,27 +2,23 @@ from pyvirtualdisplay import Display
 import torch
 import os
 import time
-import open3d as o3d
 
 from yaml_config_utils import get_config, load_config
-from interfaces import setup_LMP, LMP_interface
+from interfaces import setup_LMP
 from visualizers import ValueMapVisualizer
 from utils import set_lmp_objects
-import numpy as np
 import engine_interfaces
-from envs.pyrep_env.pyrep_quad_env import VoxPoserPyRepQuadcopterEnv
 from envs.ros_env.ros_env import VoxPoserROSDroneEnv
-from engine_interfaces import Dummy
-from VLMPipline.VLM import VLM
 from VLMPipline.VLMM import VLMProcessWrapper
 
 torch.set_grad_enabled(False)
-os.environ["ROS_MASTER_URI"] = "http://192.168.1.105:11311"
-os.environ["ROS_IP"] = "192.168.1.213"
+
+# ROS 节点配置
+os.environ["ROS_MASTER_URI"] = "http://192.168.1.105:11311" # master
+os.environ["ROS_IP"] = "192.168.1.213" # slave (本机)
 
 if __name__ == "__main__":
-    # disp = Display(visible=False, size=(1920, 1080))
-    # disp.start()
+
     # vlm config
     owlv2_model_path = "/home/randuser/models/google-owlv2-large-patch14-finetuned"
     owlv2_model_path = "/home/randuser/models/google-owlv2-base-patch16-ensemble"
@@ -30,19 +26,9 @@ if __name__ == "__main__":
     xmem_model_path = "/home/randuser/models/XMem.pth"
     resnet_18_path = "/home/randuser/models/resnet18.pth"
     resnet_50_path = "/home/randuser/models/resnet50.pth"
-    config_path = "./src/configs/pyrep_quadcopter.yaml"
-    config_path = "./src/configs/airsim_ros_quadcopter.yaml"
     config_path = "./src/configs/real_ros_quadcopter.yaml"
-    scene_target_objects = [
-        "pumpkin",
-        "house",
-        "apple",
-        "Stone lion statue",
-        "windmill",
-    ]
-    # scene_target_objects = [
-    #     "fire extinguisher",
-    # ]
+    scene_target_objects = []
+
     env_config = get_config(config_path=config_path)
 
     log_dir = os.path.join(
@@ -75,12 +61,8 @@ if __name__ == "__main__":
     vlmpipeline.start()
     prefix = "/shared/codes/VoxPoser"
 
-    ollama_config = load_config(os.path.join(prefix, "src/configs/ollama_config.yaml"))
     tgi_config = load_config(os.path.join(prefix, "src/configs/TGI_deepseek-coder-33B-instruct-AWQ.yaml"))
 
-    tgi = getattr(engine_interfaces, tgi_config["type"])(
-        **tgi_config
-    )
     tgi = getattr(engine_interfaces, tgi_config["type"])(
         **tgi_config
     )
@@ -95,12 +77,11 @@ if __name__ == "__main__":
     )
 
     descriptions, obs = env.reset()
-    # descriptions = "fly to the table, then fly to the tree, and at last fly to the sofa"
+
     descriptions = (
         "fly to the house, then fly to the point where you started"  # checked
     )
-    # descriptions = "fly to the fire extinguisher"  # "  # underchecking
-    # descriptions = "fly forward 100cm"
+
     if "description" in env_config.env:
         descriptions = env_config.env["description"]
 
@@ -109,10 +90,6 @@ if __name__ == "__main__":
     )
     voxposer_ui = lmps["plan_ui"]
     set_lmp_objects(lmps, env.get_object_names())
-    # try:
+
     voxposer_ui(descriptions)
-    # except Exception as e:
-    #     print(f"{type(e)}: {e}")
-    # env._pyrep.stop()
-    # env._pyrep.shutdown()
-    # disp.stop()
+

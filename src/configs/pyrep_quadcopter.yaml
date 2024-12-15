@@ -30,7 +30,9 @@ lmp_config:
     map_size: 100
     num_waypoints_per_plan: 10000  # set to a large number since we only do open loop for sim
     max_plan_iter: 1
-    visualize: True
+    visualize: True,
+    execute_dynamic: False
+    detect_memory: False
   lmps:
     planner:
       prompt_fname: real_planner_prompt

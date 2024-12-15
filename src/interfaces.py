@@ -254,7 +254,7 @@ class LMP_interface:
                 )
                 self._env.visualizer.visualize_plan_result(info)
             if not debug_traj_confirm:
-                input("wait for traj comfirmation")
+                input("wait for traj comfirmation (press any key to continue)")
                 debug_traj_confirm = True
             else:
                 print(

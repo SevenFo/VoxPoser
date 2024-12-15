@@ -31,3 +31,5 @@ VoxPoser.code-workspace
 *.gv
 install/
 log/
+achieved/
+cache_test/
