@@ -1,10 +1,14 @@
 from typing import List
+import traceback  # 添加在文件开头
+
 from flask import Flask, request, jsonify
 import numpy as np
 import ctypes
 import time
 import torch
 import base64
+
+torch.set_grad_enabled(False)
 
 from VLMPipline.VLM import VLM
 from VLMPipline.utils import get_device, log_info, bcolors
@@ -48,7 +52,7 @@ class VLMHTTPServer:
         self.log_dir = log_dir
 
         self.is_processed_first_frame = False
-
+        self.mask_shape = (self.input_batch_size,) + frame_shape[-2:]
         self.init_vlm()
 
     def init_vlm(self):
@@ -118,7 +122,10 @@ class VLMHTTPServer:
             + f"[{self.get_current_process_id()}]: start VLM process first frame"
             + bcolors.ENDC
         ) if self.verbose else None
-        masks = self.vlm.process_first_frame(self.labels, frame, owlv2_threshold=0.15)
+        with torch.no_grad():
+            masks = self.vlm.process_first_frame(
+                self.labels, frame, owlv2_threshold=0.02
+            )
         self.result = np.stack(masks).flatten()
         print(
             bcolors.OKCYAN
@@ -169,15 +176,15 @@ class VLMHTTPServer:
 vlm_server = VLMHTTPServer(
     labels=["label1", "label2"],  # Example labels
     frame_shape=(3, 480, 480),
-    owlv2_model_path="/root/models/google-owlv2-base-patch16-ensemble",
-    sam_model_path="/root/models/facebook-sam-vit-huge",
-    xmem_model_path="/root/models/XMem.pth",
-    resnet_18_path="/root/models/resnet18.pth",
-    resnet_50_path="/root/models/resnet50.pth",
+    owlv2_model_path="/models/google-owlv2-large-patch14-finetuned",
+    sam_model_path="/models/facebook-sam-vit-huge",
+    xmem_model_path="/models/XMem.pth",
+    resnet_18_path="/models/resnet18.pth",
+    resnet_50_path="/models/resnet50.pth",
     device="cuda:3",
     verbose=True,
     verbose_to_disk=True,
-    log_dir="/shared/codes/VoxPoser.worktrees/VoxPoser/logs/ros2_isaac_quadcopter_v2/vlms",
+    log_dir="/shared/codes/VoxPoser.worktrees/VoxPoser/logs/isaac/vlms",
     verbose_frame_every=1,
 )
 
@@ -204,8 +211,15 @@ def process_first_frame():
 
         return jsonify(result.tolist()), 200
     except Exception as e:
-        print(f"error: {str(e)}")
-        return jsonify({"error": str(e)}), 400
+        error_msg = f"Error: {str(e)}\nStack trace:\n{traceback.format_exc()}"
+        print(error_msg)  # 在服务器端打印完整错误信息
+
+        # 在开发环境中可以返回详细错误信息，生产环境建议只返回基本错误
+        if app.debug:
+            return jsonify(
+                {"error": str(e), "stack_trace": traceback.format_exc()}
+            ), 400
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @app.route("/process_frame", methods=["POST"])
@@ -224,12 +238,20 @@ def process_frame():
         if not frame.flags.writeable:
             frame = np.copy(frame)
         # 处理帧
-        result = vlm_server.process_frame(frame)
+        with torch.no_grad():
+            result = vlm_server.process_frame(frame)
 
         return jsonify(result.tolist()), 200
     except Exception as e:
-        print(f"error: {str(e)}")
-        return jsonify({"error": str(e)}), 400
+        error_msg = f"Error: {str(e)}\nStack trace:\n{traceback.format_exc()}"
+        print(error_msg)  # 在服务器端打印完整错误信息
+
+        # 在开发环境中可以返回详细错误信息，生产环境建议只返回基本错误
+        if app.debug:
+            return jsonify(
+                {"error": str(e), "stack_trace": traceback.format_exc()}
+            ), 400
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @app.route("/process_sole_frame", methods=["POST"])
@@ -253,8 +275,15 @@ def process_sole_frame():
 
         return jsonify(result.tolist()), 200
     except Exception as e:
-        print(f"error: {str(e)}")
-        return jsonify({"error": str(e)}), 400
+        error_msg = f"Error: {str(e)}\nStack trace:\n{traceback.format_exc()}"
+        print(error_msg)  # 在服务器端打印完整错误信息
+
+        # 在开发环境中可以返回详细错误信息，生产环境建议只返回基本错误
+        if app.debug:
+            return jsonify(
+                {"error": str(e), "stack_trace": traceback.format_exc()}
+            ), 400
+        return jsonify({"error": "Internal server error"}), 500
 
 
 if __name__ == "__main__":
