@@ -4,7 +4,8 @@ import numpy as np
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import distance_transform_edt
 from scipy.signal import savgol_filter
-from utils import get_clock_time, normalize_map, calc_curvature
+
+from utils.utils import get_clock_time, normalize_map, calc_curvature
 
 
 class PathPlanner:
@@ -218,7 +219,9 @@ class PathPlanner:
             path = np.concatenate([path[k:-1:k], path[-1:]])
         # skip waypoints to reduce path length
         if "pick_per_k" in self.config and self.config["pick_per_k"]:
-            print(f"[planners.py | {get_clock_time(milliseconds=True)}] before pick per k; path length: {len(path)}")
+            print(
+                f"[planners.py | {get_clock_time(milliseconds=True)}] before pick per k; path length: {len(path)}"
+            )
             pick_per_k = self.config["pick_per_k"]
             # pick every pick_ratio-th waypoint
             end_point = path[-1:, :]

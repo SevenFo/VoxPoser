@@ -3,7 +3,7 @@ import warnings
 import signal
 from functools import partial
 from LMP import LMP
-from utils import (
+from utils.utils import (
     get_clock_time,
     normalize_vector,
     pointat2quat,
@@ -18,9 +18,6 @@ import transforms3d
 import threading
 from controllers import Controller
 from planners import PathPlanner
-
-
-from envs.dummy_env import DummyEnv
 
 # creating some aliases for end effector and table in case LLMs refer to them differently (but rarely this happens)
 EE_ALIAS = [
@@ -116,10 +113,7 @@ class LMP_interface:
 
     def detect_arm(self, obj_name, enable_memory=False):
         """return an observation dict containing useful information about the object"""
-        enable_vlm = False if self._env.vlm == None else True
         object_obs_list = []
-        # enable_vlm = False
-        print(f"calling detect VLM enable: {enable_vlm}")
         if obj_name.lower() in EE_ALIAS:
             # 如果是执行器则不需要调用模型进行检测
             obs_dict = dict()
@@ -187,8 +181,11 @@ class LMP_interface:
                 obs_dict["_point_cloud_world"] = obj_pc  # in world frame
                 obs_dict["normal"] = normalize_vector(obj_normal.mean(axis=0))
                 object_obs_list.append(Observation(obs_dict))
+                print(
+                    f"[interface.py] detected {obj_name} (id: {id}), position_world: {obs_dict['_position_world']}, position_voxel: {obs_dict['position']}"
+                )
         return object_obs_list
-    
+
     def detect_quad(self, obj_name, enable_memory=False):
         """return an observation dict containing useful information about the object"""
         assert self._env.vlm is not None, "please enable VLM before calling detect_quad"
@@ -208,7 +205,7 @@ class LMP_interface:
 
             return [Observation(obs_dict)]
         else:
-            if type(self._env) == DummyEnv:
+            if type(self._env).__name__ == "DummyEnv":
                 return {
                     "name": "dummy_object",
                     "position": np.array([0, 0, 0]),
@@ -695,7 +692,6 @@ class LMP_interface:
         self._env.visualizer.save_gifs()
         return execute_info
 
-
     def execute_arm(
         self,
         movable_obs_func,
@@ -787,6 +783,7 @@ class LMP_interface:
                     f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] start executing path via controller ({len(traj_world)} waypoints){bcolors.ENDC}"
                 )
                 controller_infos = dict()
+                t_0 = time.time()
                 for i, waypoint in enumerate(traj_world):
                     # check if the movement is finished
                     if (
@@ -811,8 +808,12 @@ class LMP_interface:
                                 f"{bcolors.OKBLUE}[interfaces.py | {get_clock_time()}] skip waypoint {i+1} because it is moving in opposite direction of the final target{bcolors.ENDC}"
                             )
                             continue
+                    print(f"time (before controller): {time.time() - t_0}")
+                    t_0 = time.time()
                     # execute waypoint
                     controller_info = self._controller.execute(movable_obs, waypoint)
+                    print(f"time (control): {time.time() - t_0}")
+                    t_0 = time.time()
                     # loggging
                     movable_obs = movable_obs_func()
                     dist2target = np.linalg.norm(
@@ -829,6 +830,8 @@ class LMP_interface:
                     controller_info["controller_step"] = i
                     controller_info["target_waypoint"] = waypoint
                     controller_infos[i] = controller_info
+                    print(f"time (after control): {time.time() - t_0}")
+                    t_0 = time.time()
                 step_info["controller_infos"] = controller_infos
                 execute_info.append(step_info)
                 # check whether we need to replan

@@ -4,7 +4,7 @@ from time import sleep
 from pygments import highlight
 from pygments.lexers import PythonLexer
 from pygments.formatters import TerminalFormatter
-from utils import load_prompt, DynamicObservation, IterableDynamicObservation
+from utils.utils import load_prompt, DynamicObservation, IterableDynamicObservation
 import time, textwrap, inspect, re, os
 
 
@@ -20,7 +20,7 @@ class LMP:
         debug=False,
         env="pyrep_quadcopter",
         engine_call_fn=None,
-        log_dir = "./"
+        log_dir="./",
     ):
         self._name = name
         self._cfg = cfg
@@ -32,7 +32,7 @@ class LMP:
         self.exec_hist = ""
         self._context = None
         self._engine_call = engine_call_fn
-        self._history_file_name = os.path.join(log_dir,"code-history.txt")
+        self._history_file_name = os.path.join(log_dir, "code-history.txt")
 
     def clear_exec_hist(self):
         self.exec_hist = ""

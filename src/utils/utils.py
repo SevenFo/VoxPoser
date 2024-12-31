@@ -1,6 +1,6 @@
 import os
 import numpy as np
-import numpy as np
+import pathlib
 import plotly.graph_objects as go
 import datetime
 from transforms3d.quaternions import mat2quat
@@ -47,12 +47,13 @@ class bcolors:
 def load_prompt(prompt_fname):
     # get current directory
     curr_dir = os.path.dirname(os.path.abspath(__file__))
+    prefix = pathlib.Path(curr_dir).parent
     # get full path to file
     if "/" in prompt_fname:
         prompt_fname = prompt_fname.split("/")
-        full_path = os.path.join(curr_dir, "prompts", *prompt_fname)
+        full_path = os.path.join(prefix, "prompts", *prompt_fname)
     else:
-        full_path = os.path.join(curr_dir, "prompts", prompt_fname)
+        full_path = os.path.join(prefix, "prompts", prompt_fname)
     # read file
     try:
         with open(full_path, "r", encoding="utf-8") as f:
