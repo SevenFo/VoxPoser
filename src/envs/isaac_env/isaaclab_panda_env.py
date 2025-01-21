@@ -102,16 +102,15 @@ class Observation:
                 get_app().update()
                 pass
             value = value.result()
+        if isinstance(value, dict):
+            obs = Observation()
+            obs.update(value)
+            value = obs
         return value
 
     def __getitem__(self, key):
         value = self._getitem(key)
-        if isinstance(value, dict):
-            obs = Observation()
-            obs.update(value)
-            self._data[key] = obs
-        else:
-            self._data[key] = value  # update coroutine obj to actual value
+        self._data[key] = value  # update coroutine obj to actual value
         return self._data[key]
 
     def __setitem__(self, key, value):
@@ -199,6 +198,10 @@ class EnvIsaacLab:
             self.visualizer.update_bounds(
                 self.workspace_bounds_min, self.workspace_bounds_max
             )
+        self.use_vlm = True
+
+    def turn_off_vlm(self):
+        self.use_vlm = False
 
     def _set_camera_view_to_target_object(self):
         viewport = get_active_viewport()
@@ -292,16 +295,17 @@ class EnvIsaacLab:
         cam_obs.update({"cam_obs": self.get_camera_observation(self.env.unwrapped)})  # type: ignore
         # print(f"cam_obs async Task name: {cam_obs._data['cam_obs'].get_name()}")
         cam_obs = cam_obs["cam_obs"]  # await
-        rgbs = [cam_obs[f"{cam}_rgb"] for cam in self.cameras]
-        rgbs = np.stack(list(rgbs), axis=0)
-        masks = self._request_process_first_frame(
-            labels=self.target_objects, data_array=rgbs
-        )
-        cam_obs.update({"masks": masks})
+        if self.use_vlm:
+            rgbs = [cam_obs[f"{cam}_rgb"] for cam in self.cameras]
+            rgbs = np.stack(list(rgbs), axis=0)
+            masks = self._request_process_first_frame(
+                labels=self.target_objects, data_array=rgbs
+            )
+            cam_obs.update({"masks": masks})
         obs_dict.update({"camera": cam_obs})
         self.latest_obs.update(obs_dict)
         self.init_obs.update(obs_dict)
-        if self.latest_obs["camera"]["masks"] is None:
+        if self.use_vlm and self.latest_obs["camera"]["masks"] is None:
             carb.log_error("Failed to process first frame.")
             raise ValueError("Failed to process first frame.")
         self.latest_action = None
@@ -486,6 +490,8 @@ class EnvIsaacLab:
         return camera_data_dict
 
     def get_3d_obs_by_name_by_vlm(self, query_name):
+        assert self.use_vlm, "VLM is not enabled."
+
         if not self.latest_obs:
             carb.log_error("No observation available.")
             raise ValueError("No observation available.")
@@ -543,9 +549,9 @@ class EnvIsaacLab:
             return None
         # remove the background # [1,2] which measn there are two instances of this object
         object_instance_label = np.unique(np.mod(masks, self.category_multiplier))[1:]
-        assert (
-            len(object_instance_label) > 0
-        ), f"Object {query_name} not found in the scene"
+        assert len(object_instance_label) > 0, (
+            f"Object {query_name} not found in the scene"
+        )
         objs_points = []
         objs_normals = []
         for obj_ins_id in object_instance_label:
@@ -579,7 +585,7 @@ class EnvIsaacLab:
         points = np.concatenate(points, axis=0)
         return points, None
 
-    def apply_action(self, action):
+    def apply_action(self, action, relative_mode=False):
         """
         Applies an action in the environment and updates the state.
 
@@ -597,7 +603,11 @@ class EnvIsaacLab:
         close = False
         # if the gripper is open and the action contains a close gripper command,
         # temporarily disable the gripper, close it after moving
-        if torch.any(action[..., -1] < 0.0) and self.latest_obs["gripper_open"] == 1.0:
+        if (
+            relative_mode is False
+            and torch.any(action[..., -1] < 0.0)
+            and self.latest_obs["gripper_open"] == 1.0
+        ):
             close = True
             action[..., -1] = (
                 0.0  # temporarily disable the gripper, close it after moving
@@ -614,14 +624,20 @@ class EnvIsaacLab:
             self.latest_reward = reward
             self.latest_terminate = terminate
             self.latest_action = action.squeeze(0).cpu().numpy()
-            if np.sum(np.abs(self.get_ee_pose()[:3] - self.latest_action[:3])) < delta:
+            if (
+                relative_mode is False
+                and np.sum(np.abs(self.get_ee_pose()[:3] - self.latest_action[:3]))
+                < delta
+            ) or (relative_mode is True and time.time() - t0 > 1 / 3):
+                # absolute mode: check the position of the end effector
+                # relative mode: check the time: 3Hz
                 break
             self.logger.info(
                 f"delta: {np.sum(np.abs(self.get_ee_pose() - self.latest_action[:7]))}"
             )
         print(f"time (stepping): {time.time() - t0}")
         t0 = time.time()
-        if close:
+        if relative_mode is False and close:
             # now we can close the gripper
             action[..., -1] = -1.0  # recover the close gripper command
             self.logger.info("Closing gripper.")
@@ -767,7 +783,7 @@ class EnvIsaacLab:
             obs_dict.update({"gripper_open": 1.0})
         else:
             obs_dict.update({"gripper_open": 0.0})
-        if do_vlm:
+        if self.use_vlm and do_vlm:
             cam_obs_task = self.get_camera_observation(self.env.unwrapped)
             t0 = time.time()
             cam_obs_async = self._request_process_frame(cam_obs_task)
@@ -776,6 +792,12 @@ class EnvIsaacLab:
             obs_dict.update({"camera": cam_obs_async})
             print(f"time (update): {time.time() - t0}")
             t0 = time.time()
+        else:
+            cam_obs = Observation()
+            cam_obs.update({"cam_obs": self.get_camera_observation(self.env.unwrapped)})  # type: ignore
+            # print(f"cam_obs async Task name: {cam_obs._data['cam_obs'].get_name()}")
+            cam_obs = cam_obs["cam_obs"]  # await
+            obs_dict.update({"camera": cam_obs})
         return obs_dict
 
     def _process_action(self, action):
