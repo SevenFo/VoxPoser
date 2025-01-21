@@ -1,0 +1,17 @@
+def scout(obj_name)
+    """
+    获取指定对象的 3D 观测结果并进行后处理。
+
+    Args:
+        obj_name (str): 目标对象的名称。
+
+    Returns:
+        list: 包含目标对象观测结果的列表。
+        
+    Notes:
+        该函数不会返回None, 当未找到目标的时候会抛出错误, 而不是返回None。
+
+    Raises:
+        StateError: 如果未找到目标对象，则抛出此异常。
+
+    """

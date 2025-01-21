@@ -1,0 +1,14 @@
+def detect(query):
+    """    
+    Args:
+        query (str): 被查询目标的名称, 将返回一个指定目标的空间位置的观测结果
+    
+    Returns:
+        dict: 观测结果, 包含以下键: "name": 观测目标的名称, "position": (np.array, shape: (3,)) 体素图中的索引坐标(单位: 格子), "aabb": (np.arrray, shape: (2,3)) 目标物体占据体素图中三个坐标轴的最小值和最大值(单位: 格子), "normal": (np.array, shape (3,)) 目标物体的单位法向量, "occupancy_map": (np.array, shape(n,3)) 目标物体所占据空间的体素图
+        
+    Notes:
+        - 当 qeury = "ee", 将返回控制器(二指夹持机构)的空间位置的观测结果, 无 "normal" 和 "occupancy_map"
+        - 当 query = "table", 将返回工作台的空间位置观测结果, 无 "occupancy_map"
+        - 其余查询目标会返回所有键的查询结果
+        - 被查询目标必须是 objects 列表变量中的一个元素
+    """ 

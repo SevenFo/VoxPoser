@@ -1,0 +1,7 @@
+def get_empty_affordance_map()
+    """
+    获取一张的空的期望目标体素图
+
+    Returns:
+        np.array: 体素图 
+    """

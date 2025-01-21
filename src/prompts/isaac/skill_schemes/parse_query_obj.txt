@@ -1,0 +1,11 @@
+def parse_query_obj(query)
+    """    
+    Args:
+        query (str): 发送给该 LMP 的请求字符串, 让其编写代码返一个指定目标的空间位置的观测结果
+    
+    Returns:
+        dict: 观测结果, 包含以下键: "name": 观测目标的名称, "position": (np.array, shape: (3,)) 体素图中的索引坐标(单位: 格子), "aabb": (np.arrray, shape: (2,)) 目标物体占据体素图中三个坐标轴的最小值和最大值(单位: 格子)
+        
+    Notes:
+        当 qeury = "quadcopter" 的时候可以直接得到当前无人机的位置的观测结果
+    """

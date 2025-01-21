@@ -1,0 +1,7 @@
+def get_empty_velocity_map()
+    """
+    获取一张的空的速度体素图
+
+    Returns:
+        np.array: 体素图 
+    """

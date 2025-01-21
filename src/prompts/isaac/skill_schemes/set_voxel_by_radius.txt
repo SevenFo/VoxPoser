@@ -1,0 +1,13 @@
+def set_voxel_by_radius(voxel_map, voxel_xyz, radius_cm=0, value=1)
+    """
+    given a 3D np array, set the value of the voxel at voxel_xyz to value. If radius is specified, set the value of all voxels within the radius to value.
+    
+    Args:
+        voxel_map (np.array): 目标体素图
+        voxel_xyz (np.array): 设置区域的中心位置（体素图的索引）
+        radius_cm (float): default: 0, 设置区域的半径（单位厘米）
+        value (float): default: 1, 设置区域的值
+
+    Returns:
+        np.array: 设置后的体素图
+    """
