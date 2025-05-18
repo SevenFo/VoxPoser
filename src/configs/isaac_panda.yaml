@@ -5,8 +5,8 @@ log_dir: ./logs/isaac/panda
 env:
   workspace_bounds_min: [-0.1, -0.5, 0]
   workspace_bounds_max: [1.0, 0.5, 1.0]
-  scene_target_objects: ["cube", "hand","palm","Human palm","Human hand"]
-  description: "pick up the cube to 10 cm above (close gripper until reach the center of the cube) and put it on the Human hand (open the gripper), finnaly back to the default place" # "fly to the wooden house and keep at least 100cm away from the tree"
+  scene_target_objects: ["cube", "human finger"] # ,"palm","Human palm","hand"
+  description: "pick up the cube to 10 cm above the human finger (close gripper until reach the center of the cube) and put it on the human finger (open the gripper), finnaly back to the default place" # "fly to the wooden house and keep at least 100cm away from the tree"
 
 vlm:
   input_shape: [3, 640, 640] #[3, 480, 848] # old camera input_shape: [3, 480, 640]  [3, 720, 1280]

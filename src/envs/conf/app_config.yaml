@@ -1,0 +1,68 @@
+app:
+  headless: false
+  log_level: DEBUG
+  window_height: 720
+  window_width: 1280
+mocap:
+  model_position:
+  - -0.23478
+  - -0.50263
+  - -1.2211
+  - 0.12931
+  - 0.32347
+  - 0.69537
+  - 0.62858
+  # - null
+  # - null
+  # - null
+  # - null
+  udp_port: 8002
+robot:
+  base_position:
+  - 0.85
+  - -7.0
+  - 1.18
+  end_effector_prim_name: base_link_gripper
+  gripper_joint_names:
+  - finger_joint
+  - right_outer_knuckle_joint
+  initial_joints:
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  - 0
+  joint_names_without_gripper:
+  - shoulder_pan_joint
+  - shoulder_lift_joint
+  - elbow_joint
+  - wrist_1_joint
+  - wrist_2_joint
+  - wrist_3_joint
+  usd_path: C:/Users/hp/Documents/Projects/UR5IsaacSim/usd/ur5_with_robotiq_gripper/ur5_with_gripper_single_articulation_root.usd
+  use_gripper: true
+rtde:
+  enabled: false
+  ip: localhost
+  port: 30004
+task:
+  name: FollowTarget
+  scene_path: C:/Users/hp/Documents/Projects/UR5IsaacSim/scenes/Collected_ROOM_set_fix_0401/ROOM_set.usd
+  target_position:
+  - 0.5
+  - 0
+  - 0.4
+ui:
+  follow_time: 0.1
+  frame_time: 1.0
+  gain: 300
+  gripping_threshold: 0.05

@@ -4,6 +4,7 @@
 
 import argparse
 
+
 from omni.isaac.lab.app import AppLauncher
 
 # add argparse arguments
@@ -13,7 +14,12 @@ parser = argparse.ArgumentParser(
 parser.add_argument(
     "--num_envs", type=int, default=1, help="Number of environments to simulate."
 )
-parser.add_argument("--task", type=str, default=None, help="Name of the task.")
+parser.add_argument(
+    "--task",
+    type=str,
+    default="Isaac-Lift-Cube-Franka-IK-Abs-Cam-v0",
+    help="Name of the task.",
+)
 parser.add_argument(
     "--teleop_device",
     type=str,
@@ -23,7 +29,7 @@ parser.add_argument(
 parser.add_argument(
     "--num_demos",
     type=int,
-    default=1,
+    default=10,
     help="Number of episodes to store in the dataset.",
 )
 parser.add_argument(
@@ -82,8 +88,11 @@ if __name__ == "__main__":
     env = EnvIsaacLab(
         task_name=args_cli.task, cfg=env_config["env"], visualizer=visualizer
     )
+    env.preview(max_step=100)
     input("waiting for start!")
     obs = env.reset()
+    env.mocap_manager.move_model_to_origin()
+    env.preview()
     descriptions = env_config.env["description"]
     lmps, lmp_env = setup_LMP(env, env_config, debug=False, engine_call_fn=tgi)
     voxposer_ui = lmps["plan_ui"]

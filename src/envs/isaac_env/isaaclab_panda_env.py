@@ -10,7 +10,8 @@ import gymnasium as gym
 import os
 import torch
 import logging
-import base64, requests
+import base64
+import requests
 import numpy as np
 import open3d as o3d
 import logging
@@ -56,8 +57,8 @@ from omni.isaac.core.utils.stage import add_reference_to_stage
 from omni.isaac.core.utils.xforms import reset_and_set_xform_ops
 from pxr import Gf
 
-
-from utils.decorator import async_to_sync, maybe_coroutine
+from .mocap_manager import MocapManager
+from .config_manager import ConfigManager
 
 logging.basicConfig(level=logging.INFO)
 
@@ -154,17 +155,27 @@ class EnvIsaacLab:
         # create environment
         self.env = gym.make(task_name, cfg=env_cfg)
 
+        # cube_prim = add_reference_to_stage(
+        #     usd_path=f"/data/shared_folder/IssacAsserts/isaacsim_assets/Assets/Isaac/4.5/Isaac/Props/Blocks/DexCube/dex_cube_instanceable3.usd",
+        #     prim_path="/World/cube",
+        # )
+        # reset_and_set_xform_ops(
+        #     prim=cube_prim,
+        #     translation=Gf.Vec3d(0.5, 0, 0.055),
+        #     orientation=Gf.Quatd(0.707, 0, 0, 0.707),
+        #     scale=Gf.Vec3d(0.8, 0.8, 0.8),
+        # )
         # add people to env
-        people_prim = add_reference_to_stage(
-            usd_path=f"omniverse://localhost/Projects/lunarbase/chars/astro/astro.usd",
-            prim_path="/World/House/People",
-        )
-        reset_and_set_xform_ops(
-            prim=people_prim,
-            translation=Gf.Vec3d(45.0, -70.0, 0.0),
-            orientation=Gf.Quatd(0, 0, 0, 1.0),
-            scale=Gf.Vec3d(100.0, 100.0, 100.0),
-        )
+        # people_prim = add_reference_to_stage(
+        #     usd_path=f"omniverse://localhost/Projects/lunarbase/chars/astro/astro.usd",
+        #     prim_path="/World/House/People",
+        # )
+        # reset_and_set_xform_ops(
+        #     prim=people_prim,
+        #     translation=Gf.Vec3d(45.0, -70.0, 0.0),
+        #     orientation=Gf.Quatd(0, 0, 0, 1.0),
+        #     scale=Gf.Vec3d(100.0, 100.0, 100.0),
+        # )
 
         self._set_camera_view_to_target_object()
         self.env.unwrapped.sim.step()
@@ -199,6 +210,15 @@ class EnvIsaacLab:
                 self.workspace_bounds_min, self.workspace_bounds_max
             )
         self.use_vlm = True
+        # 初始化动作捕捉
+        self.config_manager = ConfigManager(None)
+        self.mocap_manager = MocapManager(
+            self.config_manager,
+            prim_prefix="",  # PN_Stickman_v12_ThumbInward"
+        )
+        if not self.mocap_manager.setup_scene(world=self.env.unwrapped):
+            logger.error("设置动作捕捉场景失败")
+            return False
 
     def turn_off_vlm(self):
         self.use_vlm = False
@@ -432,6 +452,7 @@ class EnvIsaacLab:
 
         camera: TiledCamera = env.scene.sensors["tiled_camera"]  # type: ignore
         camera_data_dict = {}
+        pos_offset = (0.62562, -1.29608, 2.95021)
         for key, value in camera_trans_dict.items():
             # 设置相机位置和方向
             camera.set_world_poses(
@@ -461,11 +482,17 @@ class EnvIsaacLab:
                 orientation=q_x_180,  # transform to camera coordinate (not camera optical coordinate)
                 keep_invalid=True,
             )
+
             pointcloud_data = transform_points(
                 pointcloud_data,
                 orientation=value[1].squeeze().tolist(),
                 position=value[0].squeeze().tolist(),
             )  # transform to world coordinate
+
+            # pointcloud_data = pointcloud_data - torch.tensor(
+            #     pos_offset, dtype=pointcloud_data.dtype, device=pointcloud_data.device
+            # )
+
             # save_images_to_file(rgb_data / 255, f"camera_rgb_{key}.png")
             # save_images_to_file(
             #     (depth_data.clone() - depth_data.min())
@@ -509,9 +536,9 @@ class EnvIsaacLab:
             mask_frame = latest_masks[idx]
             lookat_vector = self.camera_info[f"{cam}_lookat"]
             # save mask as image
-            # import cv2
+            import cv2
 
-            # cv2.imwrite(f"{cam}_mask.png", mask_frame.astype(np.uint8))
+            cv2.imwrite(f"{cam}_mask.png", mask_frame.astype(np.uint8))
             # np.savetxt(f"{cam}_pointcloud.txt", point, delimiter=",")
             # np.savetxt(f"{cam}_pointcloud_part.txt", point[0:1000, :], delimiter=",")
             # np.savetxt(
@@ -807,6 +834,28 @@ class EnvIsaacLab:
             1, 1
         )
         return action
+
+    def stop_preview(self):
+        self.stop_preview = True
+
+    def preview(self, max_step=100):
+        self.stop_preview = False
+        step = 0
+        try:
+            self.mocap_manager.move_model_to_origin()
+            while not self.stop_preview:
+                # Main loop for the simulation
+                app_interface = get_app()
+                app_interface.update()
+                self.mocap_manager.update_avatar_posture()
+                time.sleep(0.01)  # Sleep to avoid busy-waiting
+                step += 1
+                if step >= max_step:
+                    print("Max steps reached, stopping preview.")
+                    break
+        except KeyboardInterrupt:
+            print("Simulation loop interrupted by user.")
+            self.env.close()
 
 
 if __name__ == "__main__":
